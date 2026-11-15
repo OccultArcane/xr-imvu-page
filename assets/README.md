@@ -209,11 +209,15 @@ After each save the script re-reads the page and compares the textarea: a save t
     python tools/embed-page-in-products.py --apply
     python tools/embed-page-in-products.py --height 900 --apply
     python tools/embed-page-in-products.py --ids 76499972 --apply
+    python tools/embed-page-in-products.py --text '<b>Made to order.</b> {{embed}}' --apply
+    python tools/embed-page-in-products.py --text-file copy.html --apply
 
 Puts the published page inside each product's description as an iframe, so a shop listing carries the site itself rather than a picture of it. It is the description rewriter's machinery with a different body: same editor, same CSRF handling, same cookie file, same backups (`%TEMP%\xr-description-backups\<id>.html`), same read-back confirmation and the same exit codes.
 
-The embed is wrapped in `<!-- xr-embed:start -->` … `<!-- xr-embed:end -->`, so the script is safe to run repeatedly — an existing embed is replaced where it stands and a description without one gets it appended, never stacked twice. `--url` changes what is embedded, `--height` the frame's height (640px by default), and the block always carries a plain link under the frame.
+The copy is yours to supply: `--text` takes it on the command line, `--text-file` reads it from a file (handy for HTML with newlines). `{{embed}}` in that copy is where the frame goes; without a placeholder the copy is written first and the frame follows it, so both arrangements work. Without either flag the product keeps the text it had and only gains the frame.
+
+The whole region is wrapped in `<!-- xr-embed:start -->` … `<!-- xr-embed:end -->`, so the script is safe to run repeatedly — the region is replaced where it stands, which means a re-run with new copy swaps the old copy out rather than leaving both, while any text outside the markers is untouched. `--url` changes what is embedded, `--height` the frame's height (640px by default), and the frame always carries a plain link under it.
 
 Whether IMVU keeps an iframe is not something the script can promise: the editor may sanitise markup on save. That is why every product is re-read and compared after the post — a stripped frame is reported as `NOT saved` and counted as a failure (exit 3), not as a success. If that happens across the board, the link under the frame is what visitors still get, and the backups are how the pass is undone.
 
-`tools/test_update_descriptions.py` covers it too: that every product gets exactly one frame, that a second run replaces rather than stacks, that a dry run posts nothing, that `--height` reaches the markup, and that a lost session stops the run before anything is written.
+`tools/test_update_descriptions.py` covers it too: that every product gets exactly one frame, that a second run replaces rather than stacks, that a dry run posts nothing, that `--height` reaches the markup, that `{{embed}}` places the frame inside your copy, that copy without a placeholder puts the frame after it, that new copy replaces the old copy, and that a lost session stops the run before anything is written.

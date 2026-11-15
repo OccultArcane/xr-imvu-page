@@ -312,6 +312,32 @@ class EmbeddingThePage(EditorHarness):
 
         self.assertIn("height:900px", self.state.descriptions["111"])
 
+    def test_the_copy_goes_in_with_the_frame_where_marked(self):
+        code, out = self.run_embed(
+            "--ids", *self.ids, "--text", "<b>made to order</b> {{embed}} thanks", "--apply"
+        )
+
+        self.assertEqual(code, 0, out)
+        text = self.state.descriptions["111"]
+        self.assertLess(text.index("made to order"), text.index("<iframe"))
+        self.assertLess(text.index("<iframe"), text.index("thanks"))
+
+    def test_copy_without_a_placeholder_puts_the_frame_after_it(self):
+        self.run_embed("--ids", "111", "--text", "<i>my copy</i>", "--apply")
+
+        text = self.state.descriptions["111"]
+        self.assertLess(text.index("my copy"), text.index("<iframe"))
+
+    def test_a_re_run_with_new_copy_replaces_the_old_copy(self):
+        self.run_embed("--ids", "111", "--text", "first version", "--apply")
+        code, out = self.run_embed("--ids", "111", "--text", "second version", "--apply")
+
+        self.assertEqual(code, 0, out)
+        text = self.state.descriptions["111"]
+        self.assertIn("second version", text)
+        self.assertNotIn("first version", text)
+        self.assertEqual(text.count(self.embed.START), 1)
+
     def test_a_session_that_is_gone_stops_the_run(self):
         self.state.formless = {"111"}
 

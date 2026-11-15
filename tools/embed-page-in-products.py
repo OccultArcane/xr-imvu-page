@@ -10,6 +10,13 @@ script builds an embed block and does that for every product in one pass.
     python tools/embed-page-in-products.py --apply
     python tools/embed-page-in-products.py --ids 76499972 --apply
     python tools/embed-page-in-products.py --url https://example.com/ --height 720 --apply
+    python tools/embed-page-in-products.py --text "Made to order. {{embed}}" --apply
+    python tools/embed-page-in-products.py --text-file copy.html --apply
+
+The copy is yours: --text or --text-file is written into every product, and
+{{embed}} in it is where the frame goes. Without a placeholder the copy is
+written first and the frame follows it. Without either flag the product keeps
+whatever text it had and only gains the frame.
 
 The block is marked, so the script is safe to run again: an existing embed is
 replaced in place rather than stacked under the old one, and a description with
@@ -60,11 +67,10 @@ def load_editor():
 editor = load_editor()
 
 
-def block(url, height):
-    """The embed itself: the frame, and a link for whatever strips it."""
+def frame(url, height):
+    """The frame itself, with a link under it for whatever strips iframes."""
     return "\n".join(
         [
-            START,
             '<div style="position:relative;width:100%;max-width:960px;margin:0 auto;">',
             '  <iframe src="%s" title="XR — Premium Creator" loading="lazy" '
             'allowfullscreen style="width:100%%;height:%dpx;border:0;'
@@ -72,26 +78,43 @@ def block(url, height):
             "</div>",
             '<p style="text-align:center;margin:10px 0 0;">'
             '<a href="%s" target="_blank" rel="noopener">open XR in a new tab</a></p>' % url,
-            END,
         ]
     )
 
 
-def with_embed(description, url, height):
-    """The description with exactly one embed block in it.
+def block(url, height, text=None):
+    """The marked region this script owns: the copy, and the frame.
 
-    A marked block is replaced where it stands; without a marker the block is
-    appended, so a second run never stacks a duplicate.
+    {{embed}} in the copy is replaced by the frame, so the frame can sit
+    anywhere in it. Without a placeholder the copy comes first and the frame
+    follows. Without copy the region is just the frame.
     """
-    fresh = block(url, height)
-    text = description or ""
-    if START in text and END in text:
-        head, rest = text.split(START, 1)
+    body = (text or "").strip()
+    if "{{embed}}" in body:
+        inside = body.replace("{{embed}}", frame(url, height))
+    elif body:
+        inside = body + "\n\n" + frame(url, height)
+    else:
+        inside = frame(url, height)
+    return "\n".join([START, inside, END])
+
+
+def with_embed(description, url, height, text=None):
+    """The description with exactly one marked region in it.
+
+    A marked region is replaced where it stands — so a re-run with different
+    copy replaces the old copy instead of leaving it behind — and a description
+    without one has the region appended, never stacked twice.
+    """
+    fresh = block(url, height, text)
+    current = description or ""
+    if START in current and END in current:
+        head, rest = current.split(START, 1)
         _, tail = rest.split(END, 1)
         return head + fresh + tail
-    if not text.strip():
+    if not current.strip():
         return fresh
-    return text.rstrip() + "\n\n" + fresh
+    return current.rstrip() + "\n\n" + fresh
 
 
 def main():
@@ -102,6 +125,11 @@ def main():
     parser.add_argument("--url", default=PAGE, help="page to embed (default: %s)" % PAGE)
     parser.add_argument("--height", type=int, default=DEFAULT_HEIGHT,
                         help="iframe height in px (default: %d)" % DEFAULT_HEIGHT)
+    copy = parser.add_mutually_exclusive_group()
+    copy.add_argument("--text", metavar="HTML",
+                      help="copy to write into every product; {{embed}} marks where the frame goes")
+    copy.add_argument("--text-file", metavar="PATH",
+                      help="a file whose contents are that copy")
     parser.add_argument("--ids", nargs="+", metavar="ID",
                         help="products to touch (default: every id in assets/products.json)")
     parser.add_argument("--cookie-file", default=editor.DEFAULT_COOKIE,
@@ -121,6 +149,14 @@ def main():
         print("--url must be an http(s) address: %r" % args.url)
         return 1
 
+    text = args.text
+    if args.text_file:
+        if not os.path.exists(args.text_file):
+            print("no such file: %s" % args.text_file)
+            return 1
+        with open(args.text_file, encoding="utf-8") as handle:
+            text = handle.read()
+
     try:
         cookie = editor.load_cookie(args.cookie_file)
     except editor.SessionMissing as exc:
@@ -134,6 +170,9 @@ def main():
 
     print("embedding: %s" % args.url)
     print("frame: %dpx tall%s" % (args.height, "" if args.apply else "  (dry run — add --apply to save)"))
+    if text is not None:
+        print("copy: %d chars, " % len(text.strip())
+              + ("frame placed at {{embed}}" if "{{embed}}" in text else "frame appended below it"))
     print("products: %d" % len(ids))
 
     os.makedirs(args.backup_dir, exist_ok=True)
@@ -151,7 +190,7 @@ def main():
             continue
 
         before = field.value
-        target = with_embed(before, args.url, args.height)
+        target = with_embed(before, args.url, args.height, text)
         unchanged = target.strip() == (before or "").strip()
 
         if not args.quiet or not unchanged:
