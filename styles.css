@@ -413,7 +413,14 @@ ul { list-style: none; }
   box-shadow: var(--red-ring);
 }
 
+/* offline is the same open circle, unlit: a grey ring with the middle left dark
+   and a grey halo instead of the red one, so the plate keeps one shape whatever
+   it is saying. --dot stays for the hand-set ring, which draws from it too */
 .eyebrow[data-status="offline"] { --dot: #4d4d57; }
+.eyebrow[data-status="offline"] .eyebrow__dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #4d4d57, 0 0 10px #4d4d57;
+}
 
 /* a label typed in by hand instead of read from IMVU: the dot goes hollow and
    its glow is withheld, so it reads as a setting rather than a live reading */
