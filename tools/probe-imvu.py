@@ -9,8 +9,8 @@ network the same way? This makes the requests an hourly run makes *and* puts the
 answers through the same parsers it uses, so a green run means both halves can
 do their work from here rather than merely that IMVU is reachable:
 
-  * the shop page, parsed by `tools/refresh-products.py`'s own `parse_cards()` -- a
-    page that answers 200 but no longer carries the product card markup that
+  * the shop page, parsed by `tools/refresh-products.py`'s own `parse_cards()` --
+    a page that answers 200 but no longer carries the product card markup that
     parser needs would still leave the releases row stale;
   * one product's listing image, the 100x80 original the thumbnail is built from;
   * the five avatar pages and the five pictures the creator row loads.
@@ -93,10 +93,54 @@ def get(url):
     return status, ctype, len(body), time.monotonic() - started, body
 
 
-def row(label, status, ctype, size, took, verdict):
-    print("%-36s %6s %-18s %9d %6.1fs  %s" % (
-        label, status if status is not None else "-", ctype[:18] or "-", size, took, verdict))
-    return 0 if verdict == "ok" else 1
+def looks_like_picture(_body, ctype):
+    """A listing or avatar picture: an image, whatever the size."""
+    return None if ctype.startswith("image/") else "served %s" % (ctype or "no type")
+
+
+def looks_like_profile(body, _ctype):
+    """An avatar page: the real one carries this marker, a block page does not."""
+    return None if b"My avatar page" in body else "no profile markup in the body"
+
+
+class Probe:
+    """One target at a time: fetch it, apply the shared verdict, report the row.
+
+    Every target is judged the same way before its own check runs -- reachable,
+    a 2xx, and a body with something in it -- so those three live here instead of
+    being repeated at each call site. `expect` supplies whatever the target needs
+    beyond that and returns None when the answer is usable, or the reason it is not.
+    """
+
+    def __init__(self):
+        self.checked = 0
+        self.failures = 0
+
+    def check(self, label, url, expect=None):
+        """Print the row for one target and return its body (or the error text)."""
+        status, ctype, size, took, body = get(url)
+        self.checked += 1
+
+        if status is None:
+            reason = body
+        elif not 200 <= status < 300:
+            reason = "HTTP %d" % status
+        elif not size:
+            reason = "empty body"
+        else:
+            reason = expect(body, ctype) if expect else None
+
+        if reason:
+            self.failures += 1
+        print("%-36s %6s %-18s %9d %6.1fs  %s" % (
+            label,
+            status if status is not None else "-",
+            ctype[:18] or "-",
+            size,
+            took,
+            "ok" if reason is None else "FAILED: %s" % reason,
+        ))
+        return body
 
 
 def main():
@@ -104,77 +148,37 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     manufacturer = shop_manufacturer()
+    probe = Probe()
     print("from: %s" % sys.platform)
     print("%-36s %6s %-18s %9s %7s  %s" % ("target", "status", "content-type", "bytes", "time", "verdict"))
 
-    failures = 0
-
     # ---- the product half: the shop page has to pass the refresh's own parser
-    shop_url = SHOP_URL % manufacturer
-    status, ctype, size, took, body = get(shop_url)
     products = []
-    if status is None:
-        failures += row("shop page", status, ctype, size, took, "FAILED: %s" % body)
-    elif not (200 <= status < 300):
-        failures += row("shop page", status, ctype, size, took, "FAILED: HTTP %d" % status)
-    elif not size:
-        failures += row("shop page", status, ctype, size, took, "FAILED: empty body")
-    else:
+
+    def parse(body, _ctype):
         try:
-            products = product_tool().parse_cards(body.decode("utf-8", "replace"))
-            verdict = "ok" if products else "FAILED: no product card the parser reads"
+            products.extend(product_tool().parse_cards(body.decode("utf-8", "replace")))
         except Exception as error:  # Pillow missing, or the module moved
-            verdict = "FAILED: parser unusable: %s" % error
-        failures += row("shop page", status, ctype, size, took, verdict)
+            return "parser unusable: %s" % error
+        return None if products else "no product card the parser reads"
+
+    probe.check("shop page", SHOP_URL % manufacturer, expect=parse)
 
     if products:
         newest = products[0]
         print("  parsed: %s  %s  %d credits" % (newest["id"], newest["name"], newest["price"]))
         # the listing image the thumbnail is built from, same URL the refresh fetches
-        status, ctype, size, took, body = get(newest["image"])
-        if status is None:
-            verdict = "FAILED: %s" % body
-        elif not (200 <= status < 300):
-            verdict = "FAILED: HTTP %d" % status
-        elif not size:
-            verdict = "FAILED: empty body"
-        elif not ctype.startswith("image/"):
-            verdict = "FAILED: served %s" % (ctype or "no type")
-        else:
-            verdict = "ok"
-        failures += row("listing image: " + newest["id"], status, ctype, size, took, verdict)
+        probe.check("listing image: " + newest["id"], newest["image"], expect=looks_like_picture)
 
     # ---- the creator half: the profile pages, then the pictures they lead to
     cards = creator_cards()
     for name, _src in cards:
-        status, ctype, size, took, body = get(AVATAR_PAGE % name)
-        if status is None:
-            verdict = "FAILED: %s" % body
-        elif not (200 <= status < 300):
-            verdict = "FAILED: HTTP %d" % status
-        elif b"My avatar page" not in (body if isinstance(body, bytes) else b""):
-            verdict = "FAILED: no profile markup in the body"
-        else:
-            verdict = "ok"
-        failures += row("avatar page: " + name, status, ctype, size, took, verdict)
-
+        probe.check("avatar page: " + name, AVATAR_PAGE % name, expect=looks_like_profile)
     for name, src in cards:
-        status, ctype, size, took, _body = get(src)
-        if status is None:
-            verdict = "FAILED: %s" % _body
-        elif not (200 <= status < 300):
-            verdict = "FAILED: HTTP %d" % status
-        elif not size:
-            verdict = "FAILED: empty body"
-        elif not ctype.startswith("image/"):
-            verdict = "FAILED: served %s" % (ctype or "no type")
-        else:
-            verdict = "ok"
-        failures += row("picture: " + name, status, ctype, size, took, verdict)
+        probe.check("picture: " + name, src, expect=looks_like_picture)
 
-    total = 2 + len(cards) * 2 if products else 1 + len(cards) * 2
-    print("\n%d target(s) checked, %d failed" % (total, failures))
-    return 1 if failures else 0
+    print("\n%d target(s) checked, %d failed" % (probe.checked, probe.failures))
+    return 1 if probe.failures else 0
 
 
 if __name__ == "__main__":
