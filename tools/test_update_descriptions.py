@@ -228,5 +228,29 @@ class ProductList(EditorHarness):
         self.assertEqual(self.module.product_ids_from_json(os.path.join(self.tmp, "absent.json")), [])
 
 
+class ConsoleEncoding(unittest.TestCase):
+    """The shop is named 𝕩𝕣, which a Windows console cannot print by default.
+
+    A crash there would land partway through a batch, with the products already
+    saved and the rest untouched — so the console is widened before any output.
+    """
+
+    def test_the_shops_characters_print_on_a_narrow_console(self):
+        module = load_module()
+        raw = io.BytesIO()
+        narrow = io.TextIOWrapper(raw, encoding="cp1252")
+        real = sys.stdout
+        sys.stdout = narrow
+        try:
+            module.configure_console()
+            narrow.write("𝕩𝕣 noct den")
+            narrow.flush()
+        finally:
+            sys.stdout = real
+
+        self.assertEqual(narrow.encoding.lower(), "utf-8")
+        self.assertIn("𝕩𝕣 noct den", raw.getvalue().decode("utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

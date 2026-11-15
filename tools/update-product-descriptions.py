@@ -243,6 +243,22 @@ def read_product(cookie, product_id):
     return url, form, field
 
 
+def configure_console():
+    """Print the shop's own typography, whatever the console thinks it is.
+
+    Every product in this shop is named 𝕩𝕣 …, and a Windows console defaults to
+    cp1252, which raises UnicodeEncodeError on those characters. The crash would
+    land in the middle of a batch — after some products had already been saved —
+    so the console is widened before anything is printed.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def line(label, text):
     text = re.sub(r"\s+", " ", text or "").strip()
     return "  %-18s %s" % (label, text if text else "(empty)")
@@ -270,6 +286,7 @@ def main():
                         help="actually save; without this the run is a dry run")
     parser.add_argument("--quiet", action="store_true", help="only report changes and errors")
     args = parser.parse_args()
+    configure_console()
 
     try:
         cookie = load_cookie(args.cookie_file)
