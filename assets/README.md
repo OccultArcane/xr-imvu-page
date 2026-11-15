@@ -76,6 +76,25 @@ Any label on its first line outranks IMVU while the file is there (the log recor
 
 The watcher runs that suite once before it starts watching and **refuses to start** if it fails: exit code 2, and one log line naming the failing tests (`self-check failed: 3 failing (…) — not starting`). A broken edit therefore cannot go live in the scheduled task — the task simply does not run, `status.json` keeps its last label, and the log says why. A one-off run warns but still runs, since that is how the edit gets debugged; `--skip-self-check` silences the warning. The check is a subprocess rather than an import, so it exercises the file on disk exactly as the task would.
 
+## Being told when it changes
+
+The watcher already knows the moment the label moves — it is the thing that writes it. Add a webhook URL to `assets/notify.url` (one line, gitignored) and it posts "XR is now Online (was Offline)" there, once per change, and nothing while the label holds.
+
+The deployment has no scheduler of its own: Sites serves the endpoint on request, so nothing in the published Worker can start a message. The watcher is the only process that runs on its own, which is also why the notifications stop when the machine is off (and why the plate says `stale` rather than guessing).
+
+**Discord** (simplest if the server already exists): Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL, then:
+
+    echo "https://discord.com/api/webhooks/…" > assets/notify.url
+
+A URL containing `discord.com/api/webhooks` gets a JSON body (`{"content": …}`); anything else gets the message as plain text, so `https://ntfy.sh/<your-topic>` works from the ntfy app with no account and no JSON.
+
+**To make it live**, restart the scheduled task — the watcher runs continuously and does not reload its own file:
+
+    schtasks /End /TN "XR status refresh"
+    schtasks /Run /TN "XR status refresh"
+
+`XR_NOTIFY_URL` overrides the file if you would rather keep it in the environment. A webhook that fails is logged (`notify failed: …`) and otherwise ignored: the page still gets its label, because a notification is not worth a stale plate. Override and manual labels notify too — they go through the same write.
+
 ## Page order
 
 Pinned mark → top bar (clock, status, channels) → notice strip → launch panel (creator chips, drop head, countdown, releases grid) → footer.

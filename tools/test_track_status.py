@@ -14,6 +14,7 @@ import io
 import json
 import os
 import re
+import socket
 import sys
 import tempfile
 import threading
@@ -44,6 +45,7 @@ class Harness:
 
         track.JSON_PATH = os.path.join(root, "status.json")
         track.OVERRIDE_PATH = os.path.join(root, "status.override.txt")
+        track.NOTIFY_PATH = os.path.join(root, "notify.url")
         track.LOG_PATH = os.path.join(root, "status.log")
         track.STATE_PATH = os.path.join(root, "state.json")
         track.SAMPLE_LOG = os.path.join(root, "availability.log")
@@ -297,6 +299,89 @@ class RealRateLimit(unittest.TestCase):
 
         self.assertEqual(harness.status(), {})
         self.assertGreater(harness.track.throttle_left(), 0)
+
+
+class Notifications(unittest.TestCase):
+    """A label change goes to the webhook once, and a broken webhook is survivable."""
+
+    def serve(self, status=204):
+        seen = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                seen.append(
+                    {
+                        "path": self.path,
+                        "type": self.headers.get("Content-Type"),
+                        "body": self.rfile.read(length).decode("utf-8"),
+                    }
+                )
+                self.send_response(status)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        return "http://127.0.0.1:%d/hook" % server.server_address[1], seen
+
+    def listen(self, harness, url):
+        with open(harness.track.NOTIFY_PATH, "w", encoding="utf-8") as handle:
+            handle.write(url + "\n")
+
+    def test_no_webhook_means_no_request(self):
+        harness = Harness()
+        harness.poll()
+        self.assertEqual(harness.status()["status"], "Offline")
+        self.assertFalse(any("notified" in line or "notify failed" in line for line in harness.notes()))
+
+    def test_a_change_is_posted_once(self):
+        harness = Harness()
+        url, seen = self.serve()
+        self.listen(harness, url)
+
+        harness.poll()  # nothing published yet: Offline is a change
+        harness.poll()  # unchanged: no second post
+
+        self.assertEqual(len(seen), 1)
+        self.assertIn("Offline", seen[0]["body"])
+        self.assertTrue(any("notified:" in line for line in harness.notes()))
+
+    def test_a_discord_webhook_gets_json(self):
+        harness = Harness()
+        url, seen = self.serve()
+        self.listen(harness, url.replace("/hook", "/discord.com/api/webhooks/x"))
+
+        harness.poll()
+
+        self.assertEqual(len(seen), 1)
+        self.assertIn("application/json", seen[0]["type"])
+        self.assertIn("Offline", json.loads(seen[0]["body"])["content"])
+
+    def test_a_plain_target_gets_text(self):
+        harness = Harness()
+        url, seen = self.serve()
+        self.listen(harness, url)
+
+        harness.poll()
+
+        self.assertIn("text/plain", seen[0]["type"])
+        self.assertTrue(seen[0]["body"].startswith("XR is now "))
+
+    def test_a_dead_webhook_does_not_break_the_poll(self):
+        harness = Harness()
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        self.listen(harness, "http://127.0.0.1:%d/hook" % port)  # nothing listening
+
+        self.assertEqual(harness.poll(), 0)
+        self.assertEqual(harness.status()["status"], "Offline", "the page still gets its label")
+        self.assertTrue(any("notify failed:" in line for line in harness.notes()))
 
 
 class ServeDenyList(unittest.TestCase):

@@ -5,6 +5,9 @@
 # a hand-set status label and other local scratch
 assets/status.override.txt
 
+# the webhook that gets told when the label changes — a credential, never committed
+assets/notify.url
+
 __pycache__/
 *.pyc
 

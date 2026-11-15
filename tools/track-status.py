@@ -76,6 +76,11 @@ SAMPLE_LOG_MAX = 256 * 1024
 # a hand-written label that outranks IMVU, e.g. Creating
 OVERRIDE_PATH = os.path.join(ROOT, "assets", "status.override.txt")
 
+# where to post when the label changes: a Discord webhook URL, or anything that
+# accepts a plain POST (ntfy and friends). Kept out of git; missing means quiet.
+NOTIFY_PATH = os.path.join(ROOT, "assets", "notify.url")
+NOTIFY_TIMEOUT = 10
+
 # how long "offline" has to persist before the dot is allowed to go dark;
 # comfortably longer than the observed heartbeat gap of about three minutes
 ONLINE_GRACE = 360
@@ -318,6 +323,46 @@ def payload_matches(current, payload):
     )
 
 
+def notify_url():
+    """The webhook to post to, from XR_NOTIFY_URL or assets/notify.url."""
+    configured = os.environ.get("XR_NOTIFY_URL", "").strip()
+    if configured:
+        return configured
+    try:
+        with open(NOTIFY_PATH, encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    return line
+    except OSError:
+        pass
+    return ""
+
+
+def notify_change(label, previous):
+    """Say the new label once, when it moves. Never raises: a webhook is not
+    allowed to break the poll that feeds the page."""
+    url = notify_url()
+    if not url:
+        return False
+
+    message = "XR is now %s%s" % (label, " (was %s)" % previous if previous else "")
+    discord = "discord.com/api/webhooks" in url or "discordapp.com/api/webhooks" in url
+    body = json.dumps({"content": message}).encode("utf-8") if discord else message.encode("utf-8")
+
+    request = urllib.request.Request(url, data=body, method="POST")
+    request.add_header("Content-Type", "application/json" if discord else "text/plain; charset=utf-8")
+    request.add_header("User-Agent", "xr-status/1.0")
+    try:
+        with urllib.request.urlopen(request, timeout=NOTIFY_TIMEOUT) as response:
+            response.read()
+    except Exception as error:  # a dead webhook must not stop the watcher
+        note("notify failed: %s" % error)
+        return False
+    note("notified: %s" % message)
+    return True
+
+
 def settle(current, label, args, reason="", source="public"):
     """Write the label and a fresh timestamp on every poll.
 
@@ -338,6 +383,7 @@ def settle(current, label, args, reason="", source="public"):
         print("wrote %s (was %r, source %r)" % (label, current.get("status"), current.get("source")))
     if current.get("status") != label:
         note("status: %s%s" % (label, " (%s)" % reason if reason else ""))
+        notify_change(label, current.get("status"))
     return 0
 
 
