@@ -376,12 +376,13 @@ ul { list-style: none; }
   align-items: center;
   gap: 7px;
   margin: 0;
-  /* the status word's original type: the monospace face, uppercase, widely
-     tracked — creating and offline wear the same one, only the dot changes */
+  /* the status word wears the notice tag's type: same monospace face, same size
+     and tracking, so the two dot-and-label tags in the chrome read as one set.
+     Only the colour is the plate's own, because it carries the state */
   font-family: var(--font-mono);
-  font-size: clamp(9.5px, 1vw, 11.5px);
-  font-weight: 500;
-  letter-spacing: 0.32em;
+  font-size: clamp(8.5px, 0.85vw, 10.5px);
+  font-weight: 400;
+  letter-spacing: 0.26em;
   text-transform: uppercase;
   white-space: nowrap;
   color: #dcdce4;
