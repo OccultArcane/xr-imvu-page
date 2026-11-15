@@ -15,6 +15,10 @@
 />
 <link rel="stylesheet" href="styles.css" />
 <meta name="products-version" content="" />
+<!-- where the plate reads presence from. Empty means assets/status.json, which
+     only a machine running the watcher can keep fresh. A hosted build points
+     this at a live endpoint instead; nothing else about the page changes. -->
+<meta name="status-source" content="" />
 </head>
 <body>
 
@@ -792,18 +796,22 @@
     });
 
     /* ---------- the creator's own status ----------
-       The dot and its word come from assets/status.json, which
-       tools/track-status.py rewrites from IMVU's own presence. "Do Not Disturb"
+       The dot and its word come from assets/status.json — or from whatever
+       endpoint the status-source meta names — which tools/track-status.py
+       rewrites from IMVU's own presence. "Do Not Disturb"
        counts as offline; everything else — Online, Away, whatever IMVU publishes
        next — is shown as creating, because being at the desk is what creating
        means on this page. Those two are the only looks it has. */
-    /* the plate is a local instrument. Only this machine runs the watcher, so
-       only this machine can keep a reading fresh; on a static host the file it
-       reads is a frozen copy, and a plate that can only ever say "stale" is
-       worse than no plate. Locally it stays visible even when the reading goes
-       stale, because there a dead watcher is worth seeing. */
+    /* the plate is only as live as its source. assets/status.json is written by
+       the watcher on this machine, so on a static host it is a frozen copy and a
+       plate that can only ever say "stale" is worse than no plate. A hosted build
+       can name a live endpoint in the status-source meta instead, and then the
+       plate is worth showing there too. */
     var CAN_READ_LIVE = location.protocol === "file:" ||
       /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(location.hostname);
+    var statusSource = document.querySelector('meta[name="status-source"]');
+    var STATUS_URL = ((statusSource && statusSource.content) || "").trim() || "assets/status.json";
+    var HAS_LIVE_SOURCE = STATUS_URL !== "assets/status.json";
 
     var eyebrow = document.getElementById("creator-status");
     var statusEl = document.getElementById("creator-state");
@@ -840,11 +848,13 @@
       if (!value || stale) status = "unknown";
       var since = isFinite(at) ? new Date(at).toLocaleTimeString() : "";
       if (eyebrow) {
-        /* off loopback there is no watcher to keep the file current, so the
-           plate never appears at all — not even in the first minutes after a
-           deploy, when the committed stamp still looks fresh and a visitor
-           would watch it claim a reading and then vanish */
-        eyebrow.hidden = !CAN_READ_LIVE;
+        /* locally the plate is always there, stale or not, because a dead
+           watcher is worth seeing. On a static host with no live source it never
+           appears at all — not even in the first minutes after a deploy, when
+           the committed stamp still looks fresh. With a live endpoint named it
+           shows while the reading is fresh and hides again if that goes stale,
+           rather than sitting there claiming a reading nobody refreshed. */
+        eyebrow.hidden = CAN_READ_LIVE ? false : !(HAS_LIVE_SOURCE && status !== "unknown");
         if (eyebrow.hidden) return;
         eyebrow.dataset.status = status;
         /* a hand-set label is not a reading: the dot goes hollow and says why */
@@ -870,7 +880,7 @@
     /* re-read twice a minute — faster than the releases row, because the label
        is written by a watcher: the dot changes without a reload */
     function readStatus() {
-      fetch("assets/status.json", { cache: "no-store" })
+      fetch(STATUS_URL, { cache: "no-store" })
         .then(function (res) { return res.ok ? res.json() : null; })
         .then(function (data) {
           if (data && data.status)
