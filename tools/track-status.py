@@ -360,30 +360,47 @@ def poll(args):
         return 0
 
 
-def settle_label(state, online, now):
+def settle_label(state, online, now, held=None):
     """The confirm and grace rules, as a label decision on its own.
 
-    Kept apart from _poll so the status Worker's settle() can be driven over the
-    same samples and compared against it (tools/test_settle_parity.py). The two
-    exist to give the same answer; that test is what stops them drifting apart
-    without anyone noticing.
+    This is the Worker's rule (worker/index.js, settle()) and the two are compared
+    by tools/test_settle_parity.py, so keep them identical:
+
+      * `held` is the label already published. An online sample that is not yet
+        confirmed leaves it alone rather than claiming Offline for a poll — the
+        flash the grace exists to prevent. With nothing published yet the reading
+        decides, which is what a fresh row in the Worker does.
+      * the window starts at the first offline sample, not at the last one seen
+        online, so "six minutes offline" means what it says.
+
+    State carries `online_streak` and `offline_since`.
     """
+    label = held if held in ("Online", "Offline") else ("Online" if online else "Offline")
+    streak = int(state.get("online_streak") or 0)
+    offline_since = state.get("offline_since")
+
     if online:
-        state["online_streak"] = int(state.get("online_streak") or 0) + 1
-        state["last_online"] = now
+        offline_since = None
+        if label != "Online":
+            streak += 1
+            if streak >= ONLINE_CONFIRM:
+                label = "Online"
+                streak = 0
+        else:
+            streak = 0
+    elif label == "Online":
+        if offline_since is None:
+            offline_since = now
+        if now - float(offline_since) >= ONLINE_GRACE:
+            label = "Offline"
+            offline_since = None
+            streak = 0
     else:
-        state["online_streak"] = 0
+        streak = 0
 
-    # only claim a session once it has agreed with itself for a minute
-    confirmed = online and int(state.get("online_streak") or 0) >= ONLINE_CONFIRM
-
-    if confirmed:
-        return "Online"
-    if (not online) and now - float(state.get("last_online") or 0) < ONLINE_GRACE:
-        # an offline sample that has not yet outlasted the heartbeat gap: the
-        # client is probably still open, so hold the label rather than flash
-        return "Online"
-    return "Offline"
+    state["online_streak"] = streak
+    state["offline_since"] = offline_since
+    return label
 
 
 def _poll(args):
@@ -424,7 +441,7 @@ def _poll(args):
         save_state(state)
         return 1
 
-    label = settle_label(state, online, now)
+    label = settle_label(state, online, now, current.get("status"))
     save_state(state)
 
     log_sample("public", online, label, " streak=%s" % state.get("online_streak"))

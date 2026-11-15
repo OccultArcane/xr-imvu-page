@@ -123,7 +123,18 @@ class PresenceRules(unittest.TestCase):
         # the session machinery is gone: only a label, where it came from, and when
         self.assertEqual(set(status), {"status", "source", "updated_at"})
 
+    def test_the_first_ever_sample_seeds_the_label(self):
+        # nothing published and no state to hold: the reading decides, the same as
+        # the first request into an empty D1 row
+        self.track.read_presence = lambda member, expect: True
+        self.harness.poll()
+        self.assertEqual(self.harness.status()["status"], "Online")
+
     def test_online_needs_two_agreeing_samples(self):
+        # a label is already out there, so one true sample cannot move it
+        self.harness.write_status(
+            {"status": "Offline", "source": "public", "updated_at": "2026-01-01T00:00:00Z"}
+        )
         self.track.read_presence = lambda member, expect: True
         self.harness.poll()
         self.assertEqual(self.harness.status()["status"], "Offline", "one sample is not a session")
@@ -141,16 +152,33 @@ class PresenceRules(unittest.TestCase):
         self.harness.poll()
         self.assertEqual(self.harness.status()["status"], "Online")
 
-        # once the gap outlasts the grace window, it is believed
+        # once the window outlasts the grace, it is believed
         state = self.harness.state()
-        state["last_online"] = time.time() - self.track.ONLINE_GRACE - 1
+        self.assertIsNotNone(state.get("offline_since"), "the window opens on the first offline sample")
+        state["offline_since"] = time.time() - self.track.ONLINE_GRACE - 1
         self.harness.write_state(state)
         self.harness.poll()
         self.assertEqual(self.harness.status()["status"], "Offline")
 
-    def test_a_change_is_logged_once(self):
+    def test_a_stray_true_does_not_flash_offline(self):
+        # the measured flapping: a true after a gap is not yet a session, and it
+        # must not claim Offline on the way (the Worker holds the label here too)
         self.track.read_presence = lambda member, expect: True
-        self.harness.poll()  # first reading: Offline, because one sample is not a session
+        self.harness.poll()
+        self.harness.poll()
+        self.assertEqual(self.harness.status()["status"], "Online")
+
+        self.track.read_presence = lambda member, expect: False
+        self.harness.poll()
+        self.track.read_presence = lambda member, expect: True
+        self.harness.poll()
+
+        self.assertEqual(self.harness.status()["status"], "Online")
+
+    def test_a_change_is_logged_once(self):
+        self.harness.poll()  # nothing published, reading false: Offline
+        self.track.read_presence = lambda member, expect: True
+        self.harness.poll()  # one true sample: held, still Offline
         self.harness.poll()  # confirmed: Online
         self.harness.poll()  # unchanged: nothing new to say
         self.assertEqual(self.harness.notes(), ["status: Offline", "status: Online"])
