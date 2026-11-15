@@ -1,0 +1,9 @@
+# Nothing here is meant to be indexed: the page is shared by link, and the
+# markup behind it is the work. This is a polite request, not access control —
+# it stops search engines, and cannot stop anyone fetching the files directly.
+# The noindex meta in each page is the part crawlers actually obey reliably;
+# for a project page GitHub serves this file under /xr-imvu-page/, while
+# crawlers read robots.txt from the host root, which belongs to GitHub.
+
+User-agent: *
+Disallow: /
