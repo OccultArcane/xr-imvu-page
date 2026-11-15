@@ -840,9 +840,11 @@
       if (!value || stale) status = "unknown";
       var since = isFinite(at) ? new Date(at).toLocaleTimeString() : "";
       if (eyebrow) {
-        /* nothing fresh to report and no local watcher to blame: take the whole
-           thing off the page rather than leave it claiming a dead reading */
-        eyebrow.hidden = !(CAN_READ_LIVE || status !== "unknown");
+        /* off loopback there is no watcher to keep the file current, so the
+           plate never appears at all — not even in the first minutes after a
+           deploy, when the committed stamp still looks fresh and a visitor
+           would watch it claim a reading and then vanish */
+        eyebrow.hidden = !CAN_READ_LIVE;
         if (eyebrow.hidden) return;
         eyebrow.dataset.status = status;
         /* a hand-set label is not a reading: the dot goes hollow and says why */
