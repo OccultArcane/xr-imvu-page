@@ -86,6 +86,19 @@ def picture_id(url):
     return named.group(1) if named else ""
 
 
+def card_picture(mid, picture):
+    """The URL the card shows, given the picture the profile handed back.
+
+    The profile's own picture is already the creator's current one, and an
+    animated avatar comes back as a .gif that keeps moving, so it is used as-is.
+    A picture carrying no member id -- or somebody else's -- cannot be followed
+    back to this creator by the refresh, so the id endpoint takes its place.
+    """
+    if picture_id(picture) == mid:
+        return picture
+    return AVATAR_IMAGE.format(mid=mid)
+
+
 def member(name):
     """The member id and their own profile picture, from their avatar page."""
     try:
@@ -231,12 +244,11 @@ def main():
     # current one, and an animated avatar comes back as a .gif that keeps moving.
     # Only a picture that carries no member id is replaced, because then nothing
     # can follow the card back to this creator.
-    if picture_id(picture) == mid:
-        src = picture
+    src = card_picture(mid, picture)
+    if src == picture:
         print("picture   %s" % picture)
     else:
-        src = AVATAR_IMAGE.format(mid=mid)
-        print("picture   %s (carries no member id; the card uses %s)" % (picture, src))
+        print("picture   %s (the profile's own carries no member id, so the card uses this)" % src)
 
     link = SHOP_URL.format(mid=mid) if owns_shop else AVATAR_PAGE.format(name=urllib.parse.quote(name))
     markup = card(name, link, src)

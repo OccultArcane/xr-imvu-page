@@ -19,6 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SUITES = [
     ("creator cards", [sys.executable, "tools/test_creator_cards.py"]),
+    ("creator lookup", [sys.executable, "tools/test_creator_lookup.py"]),
     ("creator refresh", [sys.executable, "tools/test_refresh_creators.py"]),
     ("hourly refresh", [sys.executable, "tools/test_refresh_hourly.py"]),
     ("worker unit tests", ["node", "--test", "worker/"]),
