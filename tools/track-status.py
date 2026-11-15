@@ -360,6 +360,32 @@ def poll(args):
         return 0
 
 
+def settle_label(state, online, now):
+    """The confirm and grace rules, as a label decision on its own.
+
+    Kept apart from _poll so the status Worker's settle() can be driven over the
+    same samples and compared against it (tools/test_settle_parity.py). The two
+    exist to give the same answer; that test is what stops them drifting apart
+    without anyone noticing.
+    """
+    if online:
+        state["online_streak"] = int(state.get("online_streak") or 0) + 1
+        state["last_online"] = now
+    else:
+        state["online_streak"] = 0
+
+    # only claim a session once it has agreed with itself for a minute
+    confirmed = online and int(state.get("online_streak") or 0) >= ONLINE_CONFIRM
+
+    if confirmed:
+        return "Online"
+    if (not online) and now - float(state.get("last_online") or 0) < ONLINE_GRACE:
+        # an offline sample that has not yet outlasted the heartbeat gap: the
+        # client is probably still open, so hold the label rather than flash
+        return "Online"
+    return "Offline"
+
+
 def _poll(args):
     """One look at IMVU; writes the label and a fresh timestamp."""
     current = read_current()
@@ -398,24 +424,8 @@ def _poll(args):
         save_state(state)
         return 1
 
-    if online:
-        state["online_streak"] = int(state.get("online_streak") or 0) + 1
-        state["last_online"] = now
-    else:
-        state["online_streak"] = 0
+    label = settle_label(state, online, now)
     save_state(state)
-
-    # only claim a session once it has agreed with itself for a minute
-    confirmed = online and int(state.get("online_streak") or 0) >= ONLINE_CONFIRM
-
-    if confirmed:
-        label = "Online"
-    elif not online and now - float(state.get("last_online") or 0) < ONLINE_GRACE:
-        # an offline sample that has not yet outlasted the heartbeat gap: the
-        # client is probably still open, so hold the label rather than flash
-        label = "Online"
-    else:
-        label = "Offline"
 
     log_sample("public", online, label, " streak=%s" % state.get("online_streak"))
     return settle(current, label, args, source="public")
