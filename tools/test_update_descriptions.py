@@ -252,5 +252,74 @@ class ConsoleEncoding(unittest.TestCase):
         self.assertIn("𝕩𝕣 noct den", raw.getvalue().decode("utf-8"))
 
 
+def load_embed():
+    spec = importlib.util.spec_from_file_location(
+        "embed_page", os.path.join(ROOT, "tools", "embed-page-in-products.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class EmbeddingThePage(EditorHarness):
+    """The page goes into every product once, and a re-run replaces it in place."""
+
+    def setUp(self):
+        EditorHarness.setUp(self)
+        self.embed = load_embed()
+        self.embed.editor.EDITOR = self.base + "/creator/edit_product_html/%s"
+        self.embed.editor.time.sleep = lambda _s: None
+        self.ids = ["111", "222", "333"]
+        self.original = dict(self.state.descriptions)
+
+    def run_embed(self, *extra):
+        self.embed.sys.argv = ["embed-page-in-products.py", "--cookie-file", self.cookie,
+                               "--backup-dir", self.backup, "--delay", "0"] + list(extra)
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = self.embed.main()
+        return code, out.getvalue()
+
+    def test_every_product_gets_the_frame_once(self):
+        code, out = self.run_embed("--ids", *self.ids, "--apply")
+
+        self.assertEqual(code, 0, out)
+        for pid in self.ids:
+            text = self.state.descriptions[pid]
+            self.assertEqual(text.count(self.embed.START), 1, pid)
+            self.assertIn(self.embed.PAGE, text)
+            self.assertIn("iframe", text)
+            self.assertTrue(text.startswith(self.original[pid]), pid)
+
+    def test_a_second_run_replaces_rather_than_stacks(self):
+        self.run_embed("--ids", *self.ids, "--apply")
+        code, out = self.run_embed("--ids", *self.ids, "--apply")
+
+        self.assertEqual(code, 0, out)
+        for pid in self.ids:
+            self.assertEqual(self.state.descriptions[pid].count(self.embed.START), 1, pid)
+        self.assertIn("already embeds it", out)
+
+    def test_a_dry_run_posts_nothing(self):
+        code, out = self.run_embed("--ids", *self.ids)
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.state.posts, [])
+        self.assertIn("would save", out)
+
+    def test_the_height_follows_the_flag(self):
+        self.run_embed("--ids", "111", "--height", "900", "--apply")
+
+        self.assertIn("height:900px", self.state.descriptions["111"])
+
+    def test_a_session_that_is_gone_stops_the_run(self):
+        self.state.formless = {"111"}
+
+        code, out = self.run_embed("--ids", *self.ids, "--apply")
+
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.state.posts, [])
+
+
 if __name__ == "__main__":
     unittest.main()

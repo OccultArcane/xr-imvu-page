@@ -202,3 +202,18 @@ Without `--apply` it posts nothing; it prints the old and new text per product a
 After each save the script re-reads the page and compares the textarea: a save that did not stick is reported as `NOT saved` and counted as a failure (exit 3), not as success.
 
 `tools/test_update_descriptions.py` covers this against a loopback fake editor — that the form and CSRF token are found, that nothing is posted in a dry run, that a page with no form is read as a missing session, and that multipart forms post too. Python 3 only, no Pillow.
+
+## Embedding the page in every product
+
+    python tools/embed-page-in-products.py                 # dry run over every product
+    python tools/embed-page-in-products.py --apply
+    python tools/embed-page-in-products.py --height 900 --apply
+    python tools/embed-page-in-products.py --ids 76499972 --apply
+
+Puts the published page inside each product's description as an iframe, so a shop listing carries the site itself rather than a picture of it. It is the description rewriter's machinery with a different body: same editor, same CSRF handling, same cookie file, same backups (`%TEMP%\xr-description-backups\<id>.html`), same read-back confirmation and the same exit codes.
+
+The embed is wrapped in `<!-- xr-embed:start -->` … `<!-- xr-embed:end -->`, so the script is safe to run repeatedly — an existing embed is replaced where it stands and a description without one gets it appended, never stacked twice. `--url` changes what is embedded, `--height` the frame's height (640px by default), and the block always carries a plain link under the frame.
+
+Whether IMVU keeps an iframe is not something the script can promise: the editor may sanitise markup on save. That is why every product is re-read and compared after the post — a stripped frame is reported as `NOT saved` and counted as a failure (exit 3), not as a success. If that happens across the board, the link under the frame is what visitors still get, and the backups are how the pass is undone.
+
+`tools/test_update_descriptions.py` covers it too: that every product gets exactly one frame, that a second run replaces rather than stacks, that a dry run posts nothing, that `--height` reaches the markup, and that a lost session stops the run before anything is written.
