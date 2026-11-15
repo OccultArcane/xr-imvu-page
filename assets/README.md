@@ -158,6 +158,8 @@ Use this rather than `python -m http.server`. It stamps the page it serves with 
 
 IMVU's shopfront is server-rendered and sends no CORS headers, so the page cannot read it directly. `tools/refresh-products.py` reads it instead — it pulls the newest listings for the XR shop (manufacturer `106440837`), rebuilds each thumbnail as a 300×240 WebP and rewrites `products.json` atomically. A Windows scheduled task, **XR product refresh**, runs it hourly, so a new listing reaches the page within the hour (the page re-reads `products.json` every 60s, so it appears as soon as the file changes). Each run appends one line to `%TEMP%\xr-products.log`.
 
+The task itself runs `tools/refresh-hourly.py`, not this script directly: the page also depends on the creator pictures, whose URLs carry a token that only goes stale silently, so one action runs both refreshes in order and neither can take the other down with it.
+
 The shop only publishes 100×80 originals — checked against the listing markup, the product page's `resized_image` service (which caps at the source), the API's `product_image` field and the obvious filename variants, all of which return the same 100×80 PNG — so each 300×240 thumbnail is a 3× enlargement, and no resampling can invent detail that was never captured. What can be recovered is edge contrast, and it is applied **before** the resize: sharpening the 100×80 original hands LANCZOS stronger gradients to interpolate, which measured 276 against 190 (variance of the Laplacian, both scaled to the 229px the card actually draws) for a single post-pass, with only faint ringing where a heavy post-pass leaves halos. A light `1.2/80` pass afterwards settles the result. Anything stronger looked crisper in a metric but showed visible halos around the bright silver in the septum pieces, so `PRE_SHARPEN`/`POST_SHARPEN` are deliberately conservative. Thumbnails carry `imageStyle`; bump `THUMB_STYLE` when the pipeline changes so old files rebuild even though their source bytes never moved.
 
 Thumbnails are only rebuilt when the picture behind them actually changes. Each entry records a `imageHash` of the source image (plus `imageEtag`/`imageModified` when the CDN offers them), so a refresh sends a conditional request, gets `304 Not Modified`, and leaves both the file and its timestamp alone — eight files are no longer re-encoded every hour for nothing. A source that does change, a missing thumbnail, or a record with no hash all still force a rebuild, and the run reports `(N images rebuilt)` so a quiet run is visible as such.
@@ -168,7 +170,15 @@ Thumbnails are only rebuilt when the picture behind them actually changes. Each 
 Run it on a schedule and the row stays current: the page re-reads `products.json` every minute while it is open and only re-renders when the list actually changed. On Windows, the hourly task (this is the one registered here, named **XR product refresh**, starting at :07):
 
     schtasks /create /f /tn "XR product refresh" /sc hourly /mo 1 /st 00:07 ^
-      /tr "\"C:\path\to\pythonw.exe\" \"%CD%\tools\refresh-products.py\""
+      /tr "\"C:\path\to\pythonw.exe\" \"%CD%\tools\refresh-hourly.py\""
+
+`tools/refresh-hourly.py` is the whole of the task's work: it runs `refresh-products.py` and then `refresh-creators.py`, one after the other, and appends one line per tool to `%TEMP%\xr-hourly.log` — `products: ok in 2.3s -- wrote assets\products.json with 8 products`, `creators: ok in 5.7s -- every creator card is already current (5 cards)`, or `creators: failed in 0.4s (exit 1) -- <its last complaint>`. A failing tool is logged and the other still runs; the wrapper exits 1 if either failed, so the task's own **Last Result** shows it. Each tool is a subprocess with a five-minute cap, so a hung request cannot wedge the next hour's run.
+
+To point an existing task at it, do **not** use `schtasks /change`: it re-authenticates the run-as account and stops at `Please enter the run as password for matt:`, which never returns and leaves the task untouched. The task's logon type is `InteractiveToken`, so re-registering its own XML needs no password:
+
+    schtasks /query /tn "XR product refresh" /xml > task.xml
+    :: change <Arguments> to ...\tools\refresh-hourly.py, then:
+    schtasks /create /f /tn "XR product refresh" /xml task.xml
 
 On a host rather than a desktop, the same command is the whole cron/Actions step — it needs Python 3 and Pillow.
 
@@ -179,7 +189,7 @@ The animated avatars IMVU serves cannot be addressed by id alone: their filename
     python tools/refresh-creators.py           # rewrite the cards that moved
     python tools/refresh-creators.py --check    # report only
 
-It reads every card's shop id, fetches that creator's avatar page, and picks the file whose name starts with the id — animated `.gif` first — rewriting that card's `src` in place. A card that already points at a working animation is kept as it is when the profile shows nothing readable (private profiles, and accounts that upload a Snap photo, have no id-carrying file), because falling back to the id endpoint would swap a working animation for a still. Only when neither exists does the static JPEG take over. Run it on the same hourly schedule as the product refresh and the row follows the creators by itself; `tools/test_refresh_creators.py` covers the picking rules offline, against fake pages.
+It reads every card's shop id, fetches that creator's avatar page, and picks the file whose name starts with the id — animated `.gif` first — rewriting that card's `src` in place. A card that already points at a working animation is kept as it is when the profile shows nothing readable (private profiles, and accounts that upload a Snap photo, have no id-carrying file), because falling back to the id endpoint would swap a working animation for a still. Only when neither exists does the static JPEG take over. It runs unattended already: the hourly task calls `tools/refresh-hourly.py`, which runs this straight after the product refresh, so a creator's new avatar reaches the page within the hour without anyone remembering to run it. `tools/test_refresh_creators.py` covers the picking rules offline, against fake pages, and `tools/test_refresh_hourly.py` covers the wrapper around both.
 
 ## Rewriting product descriptions
 
