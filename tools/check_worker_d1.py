@@ -80,10 +80,12 @@ class LocalWorker:
         while time.time() < deadline:
             if self.process.poll() is not None:
                 raise SystemExit("wrangler dev exited:\n" + self.tail())
+            # a preflight, not a GET: it answers 204 without reading IMVU or writing
+            # a row, so the checks below still see the first real request
             try:
-                with urllib.request.urlopen(self.url, timeout=2) as response:
-                    if response.status == 200:
-                        return
+                status = request(self.url, "OPTIONS")[0]
+                if status == 204:
+                    return
             except (urllib.error.URLError, OSError):
                 pass
             time.sleep(1)
@@ -226,7 +228,10 @@ def main():
             got = rows()
             assert len(got) == 1, "expected one row, found %d" % len(got)
             assert got[0]["id"] == "xr", got[0]
+            # a cold start seeds from the one reading and opens no window, whichever
+            # way that reading went
             assert got[0]["offline_since"] is None, "a cold start has no window open"
+            assert got[0]["streak"] in (0, 1), got[0]
 
         checks.run("the first request inserted exactly one row", inserted)
 

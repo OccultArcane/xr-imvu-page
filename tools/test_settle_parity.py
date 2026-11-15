@@ -63,19 +63,25 @@ def steps(flags, gap=GAP):
     return [{"online": flag, "at": T0 + i * gap} for i, flag in enumerate(flags)]
 
 
-def watcher_labels(track, sample_steps):
-    """The watcher's answer at each step, threading its state and held label."""
+def watcher_states(track, sample_steps):
+    """What the watcher believes at each step: the label and the counters it keeps."""
     state = dict(SEED_STATE)
     held = SEED_LABEL
-    labels = []
+    seen = []
     for step in sample_steps:
         held = track.settle_label(state, step["online"], step["at"], held)
-        labels.append(held)
-    return labels
+        seen.append(
+            {
+                "label": held,
+                "streak": int(state.get("online_streak") or 0),
+                "offline_since": state.get("offline_since"),
+            }
+        )
+    return seen
 
 
-def worker_labels(flags):
-    """The Worker's answers, run through the real settle() in a Node process."""
+def worker_states(flags):
+    """The Worker's label and row at each step, through the real settle() in Node."""
     node = shutil.which("node")
     if not node:
         raise unittest.SkipTest("node is not installed, so the Worker cannot be run")
@@ -86,7 +92,7 @@ def worker_labels(flags):
     )
     if completed.returncode != 0:
         raise AssertionError("the Worker side would not run:\n" + completed.stderr)
-    return json.loads(completed.stdout)["results"][0]["labels"]
+    return json.loads(completed.stdout)["results"][0]["states"]
 
 
 class ParityTest(unittest.TestCase):
@@ -94,8 +100,12 @@ class ParityTest(unittest.TestCase):
     def setUpClass(cls):
         cls.track = load(TRACK, "track_status_parity")
 
+    def states(self, flags):
+        return watcher_states(self.track, steps(flags)), worker_states(flags)
+
     def labels(self, flags):
-        return watcher_labels(self.track, steps(flags)), worker_labels(flags)
+        watcher, worker = self.states(flags)
+        return [step["label"] for step in watcher], [step["label"] for step in worker]
 
     def test_the_thresholds_are_the_same_numbers(self):
         # the Worker's cannot be imported — an entry module may only export
@@ -128,6 +138,54 @@ class ParityTest(unittest.TestCase):
         watcher, worker = self.labels([True, False] * 6)
         self.assertEqual(watcher, [F] * 12, "the watcher flashed")
         self.assertEqual(worker, [F] * 12)
+
+    def test_the_counters_are_the_same_on_both_sides(self):
+        """Not just the word: the streak and the window have to match too.
+
+        Two implementations could print the same label from counters that had
+        drifted — a streak of 1 against 2, a window anchored a poll apart — and
+        none of the label comparisons above would notice.
+        """
+        for name, flags, _ in SCENARIOS:
+            with self.subTest(scenario=name):
+                watcher, worker = self.states(flags)
+                for index, (ours, theirs) in enumerate(zip(watcher, worker)):
+                    self.assertEqual(
+                        ours,
+                        theirs,
+                        "%s: step %d (t=+%ds) differs: watcher %r, worker %r"
+                        % (name, index, index * GAP, ours, theirs),
+                    )
+
+    def test_the_counters_are_pinned(self):
+        """Both could drift the same way; these are the values they must hold."""
+        # settled at +30, first offline at +60: the window opens there and clears
+        # at +420 when the label gives way
+        watcher, _ = self.states([True] * 2 + [False] * 15)
+        self.assertEqual(
+            watcher[2],
+            {"label": O, "streak": 0, "offline_since": T0 + 2 * GAP},
+            "the window starts at the first offline sample",
+        )
+        self.assertEqual(
+            watcher[13],
+            {"label": O, "streak": 0, "offline_since": T0 + 2 * GAP},
+            "still inside the window at +390s",
+        )
+        self.assertEqual(
+            watcher[14],
+            {"label": F, "streak": 0, "offline_since": None},
+            "cleared at +420s",
+        )
+
+        # a true sample that is not yet confirmed is one, not zero
+        watcher, _ = self.states([False, True, True])
+        self.assertEqual(watcher[1], {"label": F, "streak": 1, "offline_since": None})
+        self.assertEqual(watcher[2], {"label": O, "streak": 0, "offline_since": None})
+
+        # a false sample while the label is already Offline opens no window
+        watcher, _ = self.states([False, False])
+        self.assertEqual(watcher[1], {"label": F, "streak": 0, "offline_since": None})
 
 
 if __name__ == "__main__":

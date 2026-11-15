@@ -4,7 +4,7 @@
  * settle_label(). Not deployed (deploy.json names only index.js).
  *
  *   stdin:  {"scenarios": [{"seed": <row|null>, "steps": [{"online": bool, "at": seconds}]}]}
- *   stdout: {"results": [{"labels": [...]}]}
+ *   stdout: {"results": [{"labels": [...], "states": [{label, streak, offline_since}]}]}
  */
 
 import { settle } from "./index.js";
@@ -16,13 +16,16 @@ const input = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 const results = (input.scenarios || []).map((scenario) => {
   let previous = scenario.seed || null;
   const labels = [];
+  const states = [];
   for (const step of scenario.steps || []) {
     const result = settle(previous, Boolean(step.online), step.at);
     labels.push(result.label);
     // the row the endpoint would write back, which is the next call's `previous`
     previous = { label: result.label, streak: result.streak, offline_since: result.offlineSince };
+    // what that row holds, for the parity test to compare with the watcher's state
+    states.push({ label: result.label, streak: result.streak, offline_since: result.offlineSince });
   }
-  return { labels };
+  return { labels, states };
 });
 
 process.stdout.write(JSON.stringify({ results }));
