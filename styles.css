@@ -35,8 +35,8 @@
      900:617 ratio, so the pinned mark matches the plate identically */
   /* the bar and the footer hold one fixed height at every window size; only
      the launch panel scales */
-  --bar-h: 46px;
-  --notice-h: 28px;
+  --bar-h: 40px;
+  --notice-h: 22px;
   --header-h: calc(var(--bar-h) + var(--notice-h));
 
   /* the plate's own circle: measured at r≈710 of 2048, so it spans 69.35% of
