@@ -95,6 +95,20 @@ A URL containing `discord.com/api/webhooks` gets a JSON body (`{"content": …}`
 
 `XR_NOTIFY_URL` overrides the file if you would rather keep it in the environment. A webhook that fails is logged (`notify failed: …`) and otherwise ignored: the page still gets its label, because a notification is not worth a stale plate. Override and manual labels notify too — they go through the same write.
 
+## Checking everything
+
+    python tools/check_all.py
+
+Runs every check in one go, cheapest first, and stops at the first failure with that suite's exit status:
+
+- `node --test worker/` — the settle rule, the HTTP layer and the schema check, with `fetch` stubbed and `env.DB` faked
+- `python tools/test_track_status.py` — the watcher, over loopback sockets, including the notification webhook
+- `python tools/test_update_descriptions.py` — the caption rewriter, against a loopback editor
+- `python tools/test_settle_parity.py` — the watcher's rule against the Worker's, sample by sample
+- `python tools/check_worker_d1.py` — the Worker under `wrangler dev` against a real local D1
+
+A passing suite prints one line; a failing one prints its output. Expect about 100 seconds, most of it the D1 harness waiting for wrangler to start. `node` has to be installed; the harness downloads wrangler on first use.
+
 ## Page order
 
 Pinned mark → top bar (clock, status, channels) → notice strip → launch panel (creator chips, drop head, countdown, releases grid) → footer.
