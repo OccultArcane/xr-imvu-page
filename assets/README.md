@@ -211,7 +211,7 @@ After each save the script re-reads the page and compares the textarea: a save t
     python tools/embed-page-in-products.py --ids 76499972 --apply
     python tools/embed-page-in-products.py --text '<b>Made to order.</b> {{embed}}' --apply
     python tools/embed-page-in-products.py --text-file copy.html --apply
-    python tools/embed-page-in-products.py --catalogue assets/catalogue.json --apply
+    python tools/embed-page-in-products.py --catalogue assets/catalogue.json --replace --apply
     python tools/embed-page-in-products.py --preview size-check.html --height 700
 
 Puts the published page inside each product's description as an iframe, so a shop listing carries the site itself rather than a picture of it. It is the description rewriter's machinery with a different body: same editor, same CSRF handling, same cookie file, same backups (`%TEMP%\xr-description-backups\<id>.html`), same read-back confirmation and the same exit codes.
