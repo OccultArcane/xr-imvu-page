@@ -184,12 +184,26 @@ On a host rather than a desktop, the same command is the whole cron/Actions step
 
 ## Keeping the creator pictures current
 
-The animated avatars IMVU serves cannot be addressed by id alone: their filenames carry a token (`avatars/119374898_20348436876a9f21e11da5a.gif`) that only the creator's own avatar page shows. `catalog/image_avatar.php?cid=<id>` *is* addressable by id, but it always answers with a static 80x110 JPEG. So each card's id is resolved back to a picture by a small tool:
+The animated avatars IMVU serves cannot be addressed by id alone: their filenames carry a
+token (`avatars/119374898_20348436876a9f21e11da5a.gif`) that only the creator's own avatar
+page shows. `catalog/image_avatar.php?cid=<id>` *is* addressable by id, but it always
+answers with a static 80x110 JPEG. So each card's id is resolved back to a picture by a
+small tool:
 
     python tools/refresh-creators.py           # rewrite the cards that moved
     python tools/refresh-creators.py --check    # report only
 
-It reads every card's shop id, fetches that creator's avatar page, and picks the file whose name starts with the id — animated `.gif` first — rewriting that card's `src` in place. A card that already points at a working animation is kept as it is when the profile shows nothing readable (private profiles, and accounts that upload a Snap photo, have no id-carrying file), because falling back to the id endpoint would swap a working animation for a still. Only when neither exists does the static JPEG take over. It runs unattended already: the hourly task calls `tools/refresh-hourly.py`, which runs this straight after the product refresh, so a creator's new avatar reaches the page within the hour without anyone remembering to run it. `tools/test_refresh_creators.py` covers the picking rules offline, against fake pages, and `tools/test_refresh_hourly.py` covers the wrapper around both.
+It reads every card's shop id, fetches that creator's avatar page, and picks the file
+whose name starts with the id — animated `.gif` first — rewriting that card's `src` in
+place. A card that already points at a working animation is kept as it is when the profile
+shows nothing readable (private profiles, and accounts that upload a Snap photo, have no
+id-carrying file), because falling back to the id endpoint would swap a working animation
+for a still. Only when neither exists does the static JPEG take over. It runs unattended
+already: the hourly task calls `tools/refresh-hourly.py`, which runs this straight after
+the product refresh, so a creator's new avatar is in the page within the hour without
+anyone remembering to run it; publishing it is the same commit and push as any other
+change. `tools/test_refresh_creators.py` covers the picking rules offline, against fake
+pages, and `tools/test_refresh_hourly.py` covers the wrapper around both.
 
 ## Rewriting product descriptions
 
