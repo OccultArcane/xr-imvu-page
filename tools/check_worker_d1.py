@@ -251,6 +251,19 @@ def main():
 
         checks.run("a change against a missing row inserts one", reinsert)
 
+        def recreate():
+            # the case the first manual run found: the table goes away under a warm
+            # isolate, whose schema check is already spent
+            sql("DROP TABLE presence")
+            status6, head6, _ = request(worker.url)
+            assert status6 == 200, status6
+            assert head6.get("x-xr-state") == "settled", (
+                "degraded after the table was dropped: %s" % head6.get("x-xr-state")
+            )
+            assert len(rows()) == 1, "the table came back without a row"
+
+        checks.run("a dropped table is recreated rather than degrading", recreate)
+
         def concurrent():
             sql("DELETE FROM presence")
             results = []

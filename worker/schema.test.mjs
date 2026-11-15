@@ -102,6 +102,96 @@ test("a fresh instance checks the schema again rather than assuming it", async (
   assert.equal(second.statements.filter((sql) => CREATE.test(sql)).length, 1, "each isolate makes its own check");
 });
 
+/**
+ * A fake D1 whose table can vanish, or whose connection can die, underneath a
+ * warm isolate — the case the local run found: `schemaReady` cached true, and
+ * every later request degraded.
+ */
+function droppingEnv() {
+  let dropped = false;
+  let broken = false;
+  const statements = [];
+  const isCreate = (sql) => /^CREATE TABLE IF NOT EXISTS presence/i.test(sql.replace(/\s+/g, " ").trim());
+
+  const db = {
+    prepare(sql) {
+      const create = isCreate(sql);
+      statements.push(sql.replace(/\s+/g, " ").trim());
+      return {
+        bind() {
+          return this;
+        },
+        async first() {
+          if (broken) throw new Error("D1_ERROR: connection lost");
+          if (dropped) throw new Error("D1_ERROR: no such table: presence: SQLITE_ERROR");
+          return null;
+        },
+        async run() {
+          if (broken) throw new Error("D1_ERROR: connection lost");
+          if (create) {
+            dropped = false;
+            return;
+          }
+          if (dropped) throw new Error("D1_ERROR: no such table: presence: SQLITE_ERROR");
+        },
+      };
+    },
+  };
+
+  return {
+    env: { DB: db },
+    drop() {
+      dropped = true;
+    },
+    breakConnection() {
+      broken = true;
+    },
+    creates() {
+      return statements.filter(isCreate).length;
+    },
+  };
+}
+
+test("a table that disappears is recreated instead of degrading forever", async (t) => {
+  stubFetch(t);
+  const worker = await freshWorker();
+  const database = droppingEnv();
+
+  const first = await request(worker, database.env);
+  assert.equal(first.headers.get("x-xr-state"), "settled");
+  assert.equal(database.creates(), 1);
+
+  database.drop(); // the table goes away under a warm isolate
+  const second = await request(worker, database.env);
+
+  assert.equal(second.status, 200);
+  assert.equal(
+    second.headers.get("x-xr-state"),
+    "settled",
+    "the flag should have been forgotten and the table made again"
+  );
+  assert.equal(database.creates(), 2, "exactly one retry, so exactly one more CREATE");
+});
+
+test("a database that stays broken degrades after one retry, not a loop", async (t) => {
+  stubFetch(t);
+  const worker = await freshWorker();
+  const database = droppingEnv();
+
+  await request(worker, database.env);
+  database.breakConnection();
+
+  const response = await request(worker, database.env);
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("x-xr-state") || "", /^degraded/);
+  assert.equal(
+    database.creates(),
+    2,
+    "the retry checks the schema once more and then gives up"
+  );
+});
+
 test("a failure before the table exists leaves the check unspent", async (t) => {
   stubFetch(t);
   const worker = await freshWorker();

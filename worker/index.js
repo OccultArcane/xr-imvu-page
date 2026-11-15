@@ -108,6 +108,32 @@ async function ensureSchema(db) {
 }
 
 /**
+ * Read the row, apply the rule, write it back when it moved. Throws whatever D1
+ * throws, so the caller can decide whether the schema check needs forgetting.
+ */
+async function settleInDatabase(db, online, nowSeconds) {
+  await ensureSchema(db);
+  const previous = await db
+    .prepare("SELECT label, streak, offline_since FROM presence WHERE id = ?")
+    .bind(ROW_ID)
+    .first();
+  const result = settle(previous, online, nowSeconds);
+
+  if (result.changed) {
+    await db
+      .prepare(
+        "INSERT INTO presence (id, label, streak, offline_since) VALUES (?, ?, ?, ?) " +
+          "ON CONFLICT(id) DO UPDATE SET label = excluded.label, " +
+          "streak = excluded.streak, offline_since = excluded.offline_since"
+      )
+      .bind(ROW_ID, result.label, result.streak, result.offlineSince)
+      .run();
+  }
+
+  return result;
+}
+
+/**
  * The watcher's rules, verbatim: confirm an online reading twice, and let an
  * offline one stand for six minutes before it is believed. Returns the label to
  * publish and whether the stored row had to change.
@@ -184,23 +210,23 @@ export default {
       );
     }
 
-    try {
-      await ensureSchema(db);
-      const previous = await db
-        .prepare("SELECT label, streak, offline_since FROM presence WHERE id = ?")
-        .bind(ROW_ID)
-        .first();
-      const result = settle(previous, online, nowSeconds);
+    // whether this attempt will trust an earlier schema check rather than making
+    // one: only then can a failure mean "the table has gone"
+    const assumed = schemaReady;
 
-      if (result.changed) {
-        await db
-          .prepare(
-            "INSERT INTO presence (id, label, streak, offline_since) VALUES (?, ?, ?, ?) " +
-              "ON CONFLICT(id) DO UPDATE SET label = excluded.label, " +
-              "streak = excluded.streak, offline_since = excluded.offline_since"
-          )
-          .bind(ROW_ID, result.label, result.streak, result.offlineSince)
-          .run();
+    try {
+      let result;
+      try {
+        result = await settleInDatabase(db, online, nowSeconds);
+      } catch (error) {
+        // A statement failed on a table this isolate believed was there. The
+        // likeliest cause is that it is not — rebuilt or dropped underneath — so
+        // forget the check and try once more, rather than answering degraded for
+        // the rest of the isolate's life. When the CREATE itself just failed there
+        // is nothing to forget, so the error goes straight out.
+        if (!assumed) throw error;
+        schemaReady = false;
+        result = await settleInDatabase(db, online, nowSeconds);
       }
 
       return reply(
