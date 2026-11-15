@@ -538,6 +538,10 @@
         thumb.alt = item.name || "";
         thumb.loading = "lazy";
 
+        /* the picture in its own frame, so the caption can sit below it */
+        var frame = document.createElement("span");
+        frame.className = "tile__frame";
+
         var info = document.createElement("span");
         info.className = "tile__info";
 
@@ -551,7 +555,8 @@
 
         info.appendChild(name);
         info.appendChild(price);
-        link.appendChild(thumb);
+        frame.appendChild(thumb);
+        link.appendChild(frame);
         link.appendChild(info);
         li.appendChild(link);
         return li;

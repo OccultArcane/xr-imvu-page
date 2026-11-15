@@ -116,7 +116,7 @@ Pinned mark → top bar (clock, status, channels) → notice strip → launch pa
 ## Ported from `xr-launch-countdown`
 
 - **Countdown** — the weekly drop, every Friday at local midnight. The target is derived from the clock (`nextDrop()` in `index.html`), so it rolls over to the next Friday the moment a drop opens; the label switches to "Drop day" on the day itself. Change `DROP_WEEKDAY` (5 = Friday, 0 = Sunday) or `DROP_HOUR` to move it.
-- **Product tiles** — rendered from `products.json` at load: name, price in credits and the link into the shop, with the rebuilt 300×240 WebP in `assets/products/`. Four cards show at every width; past four the row clones itself and loops.
+- **Product tiles** — rendered from `products.json` at load: name, price in credits and the link into the shop, with the rebuilt WebP in `assets/products/`. Six cards show on the desktop row and two on a phone; past that the row clones itself and loops.
 - **Creators** — `chokinglotus`, `Numen`, `G59` and `scissors`, each linking to their IMVU shop by manufacturer id. The shipped JPEG paints immediately; their current IMVU upload replaces it once it decodes, so the frame never blanks.
 - **Socials** — Pinterest and Instagram point at the real accounts. Discord has no invite in the source project either, so it renders dimmed and unclickable.
 - **Clock** — `[ HH:MM:SS ]` in the bracket style, from the local system clock.
@@ -125,23 +125,13 @@ To change the products by hand, edit `assets/products.json` — newest first. Ea
 
 ## Product captions
 
-A tile's caption sits on a scrim (`.tile__info::before`), because the artwork above it can be anything from near-black to a bright white prop:
+The caption sits below the artwork, not on it. A card is `a.tile` holding a `span.tile__frame` — the picture area, which carries the border, the radius and the 5:4 `aspect-ratio` — followed by a `span.tile__info` with the name and the credits. The image fills the frame and the frame takes the card's height, so the picture gets all of it and nothing from the caption overlaps it. There is no scrim, and the caption no longer fades on hover: it is outside the picture, so there is nothing to clear away from.
 
-    linear-gradient(180deg, rgba(5,5,8,0) 0%, rgba(5,5,8,0.55) 12%, rgba(5,5,8,0.8) 40%, rgba(5,5,8,0.94) 100%)
+Every caption reserves two lines for the name — `min-height: 2.6em`, two lines at the `1.3` line-height — and clamps anything longer with `-webkit-line-clamp: 2`, so a name past two lines is cut with an ellipsis instead of growing the caption. The reservation is what keeps the row even: the cards are one flex row, so a name wrapping to a third line would make its own card taller and drop its price below its neighbours' prices, and the seam between one caption height and the next is immediately visible. The cost is one blank line above the price on a card whose name fits on a single line.
 
-The 12% stop is not decoration. A single-line name starts about a quarter of the way down the caption block, but a long one wraps to three lines on a narrow card and reaches within 14% of the top — where a slower ramp left white ink at 4.24:1 on the brightest upload. The 40% stop then carries the rest.
+The frame is 5:4 for the same reason IMVU's own listings are: it publishes product images at 100x80. At that ratio `object-fit: cover` has nothing to crop, so the six-across row (about 138px at a 992px window) draws each image at close to its own size instead of stretching it.
 
-Measured by painting the caption text transparent, screenshotting the rendered page and sampling the background pixels under each line (WCAG relative luminance; the price line composited at its 80% white). Every card carried a deliberately long name so each block wrapped as far as it can:
-
-| width | layout | weakest line | contrast |
-| --- | --- | --- | --- |
-| 390px | 2 cards, name wraps to 3 lines | first name line | **8.31:1** |
-| 600px | 2 cards, 2 lines | first name line | 10.23:1 |
-| 620px | breakpoint, 2 cards, 2 lines | first name line | 10.03:1 |
-| 640px | 4 cards, 3 lines | first name line | **7.83:1** |
-| 1124px | 4 cards, 2 lines over the brightest prop in the artwork | first name line | 9.42:1 |
-
-Body text needs 4.5:1 and white on near-black is what the design wants, so the worst figure anywhere — 7.83:1 at 640px — is the number to keep. Prices measure 10–12:1 throughout, and the median background under a caption stays at or below 0.015 luminance. The first line of a wrapped name is always the weakest point, at any width: if the gradient, the caption padding or the font sizes change, re-measure that line rather than assuming it still clears.
+An earlier layout put the caption over the artwork behind a gradient scrim, and the contrast measurements taken against it — worst case 7.83:1 on a wrapped first line at 640px — belonged to that layout only. They are not carried over: the ink now sits on the page's dark plate, not on the picture. If the caption ever moves back over the artwork, that gradient (0.55 at 12%, 0.80 at 40%, 0.94 at 100%) and those measurements are where to start, and the first line of a wrapped name is the line to re-measure.
 
 ## Adding a creator
 
