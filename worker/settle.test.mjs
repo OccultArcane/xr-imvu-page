@@ -8,8 +8,8 @@
  *
  *   node --test worker/
  *
- * The rule itself mirrors tools/track-status.py; where the two disagree, the
- * watcher is right and this file is the bug.
+ * The rule mirrors tools/track-status.py; tools/test_settle_parity.py compares the
+ * two, so a change here that is not matched there fails that test.
  */
 
 import test from "node:test";
@@ -17,10 +17,9 @@ import assert from "node:assert/strict";
 
 import { settle } from "./index.js";
 
-// The published thresholds, written out rather than imported: a Worker's entry
-// module may only export functions, or workerd refuses to start it (worker/index.js
-// notes the failure this caused). The boundary tests below are what pin the
-// numbers — 359s holds, 360s flips, one true is not enough.
+// Written out rather than imported: a Worker entry module may only export
+// functions, or workerd refuses to start it (worker/index.js records the failure
+// this caused). The boundary tests below are what pin the numbers.
 const ONLINE_CONFIRM = 2;
 const ONLINE_GRACE = 360;
 
@@ -31,8 +30,17 @@ function row(label, streak = 0, offlineSince = null) {
   return { label, streak, offline_since: offlineSince };
 }
 
-function store(result) {
-  return { label: result.label, streak: result.streak, offline_since: result.offlineSince };
+/**
+ * Settle a whole run of samples, threading each answer back as the next row the
+ * way the endpoint writes it. `samples` is a list of [online, at] pairs.
+ */
+function play(seed, samples) {
+  let previous = seed;
+  return samples.map(([online, at]) => {
+    const result = settle(previous, online, at);
+    previous = row(result.label, result.streak, result.offlineSince);
+    return result;
+  });
 }
 
 test("a cold start takes the first reading as the label", () => {
@@ -40,45 +48,35 @@ test("a cold start takes the first reading as the label", () => {
   assert.equal(settle(null, false, T0).label, "Offline");
 });
 
-test("two agreeing online samples are needed to claim online", () => {
-  const first = settle(row("Offline"), true, T0);
+test("online needs two agreeing samples, including after a settled offline", () => {
+  const [first, second] = play(row("Offline"), [
+    [true, T0],
+    [true, T0 + 30],
+  ]);
+
   assert.equal(first.label, "Offline", "one sample is not enough");
   assert.equal(first.streak, 1);
   assert.equal(first.changed, true);
 
-  const second = settle(store(first), true, T0 + 30);
   assert.equal(second.label, "Online");
   assert.equal(second.streak, 0);
   assert.equal(second.changed, true);
 });
 
-test("a settled offline creator needs the same confirmation to come back", () => {
-  const first = settle(row("Offline"), true, T0);
-  assert.equal(first.label, "Offline");
-  const second = settle(store(first), true, T0 + 30);
-  assert.equal(second.label, "Online");
-});
-
-test("a steady online reading changes nothing and writes nothing", () => {
+test("a steady online reading writes nothing", () => {
   const result = settle(row("Online"), true, T0);
   assert.equal(result.label, "Online");
   assert.equal(result.changed, false, "no row write when the state is unchanged");
 });
 
-test("a steady offline reading changes nothing and writes nothing", () => {
-  const result = settle(row("Offline"), false, T0);
-  assert.equal(result.label, "Offline");
-  assert.equal(result.changed, false);
-});
-
-test("an offline sample is recorded at once but not believed", () => {
+test("an offline sample opens the window without believing it", () => {
   const result = settle(row("Online"), false, T0);
-  assert.equal(result.label, "Online", "still online during the grace window");
+  assert.equal(result.label, "Online", "still online during the window");
   assert.equal(result.offlineSince, T0, "the window starts now");
   assert.equal(result.changed, true, "recording the window is a write");
 });
 
-test("the grace window is six minutes, to the second", () => {
+test("the window turns offline at exactly six minutes, not a second early", () => {
   const started = row("Online", 0, T0);
 
   const justBefore = settle(started, false, T0 + ONLINE_GRACE - 1);
@@ -91,34 +89,39 @@ test("the grace window is six minutes, to the second", () => {
   assert.equal(atTheEdge.streak, 0);
 });
 
-test("a true sample inside the window cancels the countdown", () => {
-  const result = settle(row("Online", 0, T0), true, T0 + 120);
-  assert.equal(result.label, "Online");
-  assert.equal(result.offlineSince, null);
-  assert.equal(result.changed, true, "clearing the window is a write");
+test("a true sample inside the window cancels it, and the next one starts fresh", () => {
+  const [cancelled, later] = play(row("Online", 0, T0), [
+    [true, T0 + 120],
+    [false, T0 + 600],
+  ]);
 
-  // and a later offline stretch gets a fresh six minutes, not the old one
-  const later = settle(store(result), false, T0 + 600);
+  assert.equal(cancelled.label, "Online");
+  assert.equal(cancelled.offlineSince, null);
+  assert.equal(cancelled.changed, true, "clearing the window is a write");
+
   assert.equal(later.label, "Online");
-  assert.equal(later.offlineSince, T0 + 600);
+  assert.equal(later.offlineSince, T0 + 600, "six minutes from here, not from T0");
 });
 
 test("a flapping flag never takes the label off online", () => {
   // the real-world case: IMVU alternates almost every sample
-  let state = row("Online");
-  for (let i = 0; i < 40; i += 1) {
-    const online = i % 2 === 0;
-    const result = settle(state, online, T0 + i * 15);
-    assert.equal(result.label, "Online", `sample ${i} (online=${online}) dropped the label`);
-    state = store(result);
-  }
+  const samples = Array.from({ length: 40 }, (_, i) => [i % 2 === 0, T0 + i * 15]);
+  const results = play(row("Online"), samples);
+
+  results.forEach((result, i) => {
+    assert.equal(result.label, "Online", `sample ${i} dropped the label`);
+  });
 });
 
-test("a long offline stretch ends in offline once, not repeatedly", () => {
-  const settled = settle(row("Online", 0, T0), false, T0 + ONLINE_GRACE);
-  assert.equal(settled.label, "Offline");
+test("a long offline stretch settles once and then stops writing", () => {
+  const [settled, again] = play(row("Online", 0, T0), [
+    [false, T0 + ONLINE_GRACE],
+    [false, T0 + ONLINE_GRACE + 30],
+  ]);
 
-  const again = settle(store(settled), false, T0 + ONLINE_GRACE + 30);
+  assert.equal(settled.label, "Offline");
+  assert.equal(settled.changed, true);
+
   assert.equal(again.label, "Offline");
   assert.equal(again.changed, false, "nothing to write while it stays offline");
 });

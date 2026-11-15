@@ -1,12 +1,15 @@
 /**
  * HTTP-layer tests for the presence endpoint.
  *
- * worker/settle.test.mjs covers the rule; this covers the handler around it:
- * what a visitor gets when IMVU cannot be reached, when D1 misbehaves, and what
- * headers every answer carries. No deployment and no network — the upstream
- * `fetch` is stubbed and `env.DB` is a fake that can be told to fail.
+ * worker/settle.test.mjs covers the rule; this covers the handler around it: what
+ * a visitor gets when IMVU cannot be reached, when D1 misbehaves, and what headers
+ * every answer carries. No deployment and no network — the upstream `fetch` is
+ * stubbed and `env.DB` is a fake that can fail on a read or a write.
  *
  *   node --test worker/
+ *
+ * The fake accepts any SQL, so nothing here proves the statements are valid
+ * SQLite. `wrangler dev` against a local D1 does (worker/wrangler.test.jsonc).
  */
 
 import test from "node:test";
@@ -17,10 +20,7 @@ import worker from "./index.js";
 const USER_URL = "https://api.imvu.com/user/user-106440837";
 const ENDPOINT = "https://status.test/";
 
-/**
- * IMVU's real payload shape, trimmed to what the endpoint reads: a denormalized
- * map keyed by the node URL, with `data.username` and `data.online` inside.
- */
+/** IMVU's payload, trimmed to what the endpoint reads. */
 function upstream(online, username = "xr") {
   return {
     id: USER_URL,
@@ -39,9 +39,9 @@ function jsonResponse(body, status = 200) {
 function stubFetch(handler) {
   const original = globalThis.fetch;
   const calls = [];
-  globalThis.fetch = async (url, init) => {
-    calls.push({ url: String(url), init: init || {} });
-    return handler(String(url), init || {});
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    return handler(String(url), init);
   };
   return {
     calls,
@@ -52,34 +52,36 @@ function stubFetch(handler) {
 }
 
 /**
- * A fake env.DB. `failOn` names the operation to break: "prepare", "first" or
- * "run". Writes are recorded so a test can assert nothing was written.
+ * A fake env.DB: one row, no SQL, and the two failures that matter. `writes`
+ * records every run() so a test can assert that nothing was written.
  */
-function fakeEnv({ row = null, failOn = null } = {}) {
+function fakeEnv({ row = null, failRead = false, failWrite = false } = {}) {
   const writes = [];
   const db = {
     prepare(sql) {
-      if (failOn === "prepare") throw new Error("D1 unavailable");
       return {
-        sql,
         args: [],
         bind(...args) {
           this.args = args;
           return this;
         },
         async first() {
-          if (failOn === "first") throw new Error("D1 read failed");
+          if (failRead) throw new Error("D1 read failed");
           return row;
         },
         async run() {
-          if (failOn === "run") throw new Error("D1 write failed");
+          if (failWrite) throw new Error("D1 write failed");
           writes.push({ sql, args: this.args });
-          return { success: true };
         },
       };
     },
   };
   return { env: { DB: db }, writes };
+}
+
+/** The writes that would change the stored label, ignoring the schema statement. */
+function labelWrites(writes) {
+  return writes.filter((write) => /INSERT INTO presence/.test(write.sql));
 }
 
 async function call(env, init = {}) {
@@ -90,27 +92,23 @@ async function body(response) {
   return JSON.parse(await response.text());
 }
 
-function assertCors(response, label = "") {
-  assert.equal(response.headers.get("access-control-allow-origin"), "*", "CORS origin " + label);
-  assert.match(response.headers.get("content-type") || "", /application\/json/, "json content type " + label);
-}
-
-function assertNoStore(response, label = "") {
+/** Everything a successful or failed answer must carry, whatever its status. */
+function assertAnswer(response, label) {
+  assert.equal(response.headers.get("access-control-allow-origin"), "*", "CORS " + label);
   const cache = (response.headers.get("cache-control") || "").toLowerCase();
-  assert.match(cache, /no-store/, "no-store missing " + label);
-  assert.match(cache, /max-age=0/, "max-age=0 missing " + label);
+  assert.match(cache, /no-store/, "no-store " + label);
+  assert.match(cache, /max-age=0/, "max-age=0 " + label);
+  assert.match(response.headers.get("content-type") || "", /application\/json/, "JSON " + label);
 }
 
 test("a good reading answers the three keys with no-store and CORS", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-  const { env } = fakeEnv({ row: null });
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
-  const response = await call(env);
+  const response = await call(fakeEnv().env);
 
   assert.equal(response.status, 200);
-  assertCors(response, "on success");
-  assertNoStore(response, "on success");
+  assertAnswer(response, "on success");
   assert.equal(response.headers.get("x-xr-state"), "settled");
 
   const payload = await body(response);
@@ -119,58 +117,49 @@ test("a good reading answers the three keys with no-store and CORS", async (t) =
   assert.equal(payload.source, "public");
   assert.match(payload.updated_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 
-  assert.equal(fetchStub.calls.length, 1);
-  assert.equal(fetchStub.calls[0].url, USER_URL);
-  // the upstream read must not be answered from Cloudflare's edge cache
-  assert.equal(fetchStub.calls[0].init.cf.cacheTtl, 0, "upstream cache disabled");
+  assert.equal(imvu.calls.length, 1);
+  assert.equal(imvu.calls[0].url, USER_URL);
+  assert.equal(imvu.calls[0].init.cf.cacheTtl, 0, "the upstream read bypasses the edge cache");
 });
 
-test("the stored row decides the label, not the raw reading", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-  // offline until two samples agree: one online sample only moves the streak
+test("the stored row decides the label, and an unchanged row is not rewritten", async (t) => {
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
+  // Offline until two samples agree, so one online sample only moves the streak
   const { env, writes } = fakeEnv({ row: { label: "Offline", streak: 0, offline_since: null } });
 
-  const payload = await body(await call(env));
-
-  assert.equal(payload.status, "Offline");
-  const labelWrite = writes.find((w) => /INSERT INTO presence/.test(w.sql));
+  assert.equal((await body(await call(env))).status, "Offline");
+  const [labelWrite] = labelWrites(writes);
   assert.ok(labelWrite, "the streak change is persisted");
   assert.deepEqual(labelWrite.args, ["xr", "Offline", 1, null]);
-});
 
-test("a steady reading writes no row", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-  const { env, writes } = fakeEnv({ row: { label: "Online", streak: 0, offline_since: null } });
-
-  const payload = await body(await call(env));
-
-  assert.equal(payload.status, "Online");
-  assert.equal(writes.filter((w) => /INSERT INTO presence/.test(w.sql)).length, 0);
+  // the row the first request left behind is now steady: same reading, no write
+  writes.length = 0;
+  const steady = fakeEnv({ row: { label: "Online", streak: 0, offline_since: null } });
+  assert.equal((await body(await call(steady.env))).status, "Online");
+  assert.deepEqual(labelWrites(steady.writes), [], "a steady reading writes no row");
 });
 
 test("IMVU being unreachable is a 502, never an offline reading", async (t) => {
-  const fetchStub = stubFetch(async () => {
+  const imvu = stubFetch(async () => {
     throw new Error("getaddrinfo ENOTFOUND api.imvu.com");
   });
-  t.after(() => fetchStub.restore());
-  const { env, writes } = fakeEnv({ row: null });
+  t.after(() => imvu.restore());
+  const { env, writes } = fakeEnv();
 
   const response = await call(env);
 
   assert.equal(response.status, 502);
-  assertCors(response, "on 502");
-  assertNoStore(response, "on 502");
+  assertAnswer(response, "on 502");
   const payload = await body(response);
   assert.match(payload.error, /ENOTFOUND/);
   assert.equal(payload.status, undefined, "no status is invented");
-  assert.equal(writes.length, 0, "nothing is written when the read failed");
+  assert.deepEqual(writes, [], "nothing is stored when the read failed");
 });
 
 test("an HTTP error from IMVU is a 502", async (t) => {
-  const fetchStub = stubFetch(async () => new Response("nope", { status: 503 }));
-  t.after(() => fetchStub.restore());
+  const imvu = stubFetch(async () => new Response("nope", { status: 503 }));
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env);
 
@@ -179,8 +168,10 @@ test("an HTTP error from IMVU is a 502", async (t) => {
 });
 
 test("a payload without a presence flag is a 502", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse({ id: USER_URL, denormalized: { [USER_URL]: { data: {} } } }));
-  t.after(() => fetchStub.restore());
+  const imvu = stubFetch(async () =>
+    jsonResponse({ id: USER_URL, denormalized: { [USER_URL]: { data: {} } } })
+  );
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env);
 
@@ -189,8 +180,8 @@ test("a payload without a presence flag is a 502", async (t) => {
 });
 
 test("a payload for the wrong account is a 502", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true, "someone-else")));
-  t.after(() => fetchStub.restore());
+  const imvu = stubFetch(async () => jsonResponse(upstream(true, "someone-else")));
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env);
 
@@ -200,47 +191,36 @@ test("a payload for the wrong account is a 502", async (t) => {
   assert.match(error, /not "xr"/);
 });
 
-test("D1 failing to prepare degrades to the raw reading", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(false)));
-  t.after(() => fetchStub.restore());
-  const { env } = fakeEnv({ failOn: "prepare" });
+test("a D1 read failure degrades to the raw reading and says so", async (t) => {
+  const imvu = stubFetch(async () => jsonResponse(upstream(false)));
+  t.after(() => imvu.restore());
 
-  const response = await call(env);
+  const response = await call(fakeEnv({ failRead: true }).env);
 
   assert.equal(response.status, 200, "a visitor still gets an answer");
-  assertCors(response, "on degraded");
-  assertNoStore(response, "on degraded");
-  assert.match(response.headers.get("x-xr-state") || "", /^degraded/);
+  assertAnswer(response, "on degraded");
+  assert.match(response.headers.get("x-xr-state") || "", /^degraded: D1 read failed/);
+  assert.match(
+    response.headers.get("access-control-expose-headers") || "",
+    /x-xr-state/,
+    "the browser has to be allowed to see the marker"
+  );
   assert.equal((await body(response)).status, "Offline", "the raw reading, unsettled");
 });
 
-test("D1 failing to read degrades to the raw reading", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-  const { env } = fakeEnv({ failOn: "first" });
+test("a D1 write failure degrades rather than failing the visitor", async (t) => {
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
-  const response = await call(env);
-
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("x-xr-state") || "", /^degraded: D1 read failed/);
-  assert.equal((await body(response)).status, "Online");
-});
-
-test("D1 failing to write degrades rather than failing the visitor", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-  // an empty row is a change, so this path attempts the write and hits the error
-  const { env } = fakeEnv({ row: null, failOn: "run" });
-
-  const response = await call(env);
+  const response = await call(fakeEnv({ failWrite: true }).env);
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get("x-xr-state") || "", /^degraded: D1 write failed/);
 });
 
 test("no DB binding at all degrades to the raw reading", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
   const response = await call({});
 
@@ -249,9 +229,9 @@ test("no DB binding at all degrades to the raw reading", async (t) => {
   assert.equal((await body(response)).status, "Online");
 });
 
-test("CORS preflight is answered without touching IMVU", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
+test("the CORS preflight costs no upstream read", async (t) => {
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env, { method: "OPTIONS" });
 
@@ -259,37 +239,28 @@ test("CORS preflight is answered without touching IMVU", async (t) => {
   assert.equal(response.headers.get("access-control-allow-origin"), "*");
   assert.match(response.headers.get("access-control-allow-methods") || "", /GET/);
   assert.match(response.headers.get("access-control-allow-headers") || "", /accept/);
-  assert.equal(fetchStub.calls.length, 0, "a preflight costs no upstream read");
-});
-
-test("the degraded marker is exposed to the browser", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
-
-  const response = await call(fakeEnv().env);
-
-  assert.match(response.headers.get("access-control-expose-headers") || "", /x-xr-state/);
+  assert.equal(imvu.calls.length, 0);
 });
 
 test("a write method is refused with 405 and a hint", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env, { method: "POST" });
 
   assert.equal(response.status, 405);
   assert.match(response.headers.get("allow") || "", /GET/);
-  assertCors(response, "on 405");
-  assert.equal(fetchStub.calls.length, 0);
+  assert.equal(response.headers.get("access-control-allow-origin"), "*");
+  assert.equal(imvu.calls.length, 0);
 });
 
-test("HEAD answers with no body", async (t) => {
-  const fetchStub = stubFetch(async () => jsonResponse(upstream(true)));
-  t.after(() => fetchStub.restore());
+test("HEAD answers with the headers and no body", async (t) => {
+  const imvu = stubFetch(async () => jsonResponse(upstream(true)));
+  t.after(() => imvu.restore());
 
   const response = await call(fakeEnv().env, { method: "HEAD" });
 
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "");
-  assertNoStore(response, "on HEAD");
+  assert.match(response.headers.get("cache-control") || "", /no-store/);
 });
