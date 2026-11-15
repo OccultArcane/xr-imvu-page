@@ -702,10 +702,7 @@ ul { list-style: none; }
 .timer__date { font-variant-numeric: tabular-nums; }
 
 .timer__unit {
-  /* the band carries the height the product row gave back: the cards are 5:4
-     now, so the row is ~33px shallower and the countdown grows to fill it,
-     keeping the panel's footprint and the footer where they were */
-  padding: clamp(10px, 2.5vh, 26px) 6px;
+  padding: clamp(8px, 1.6vh, 18px) 6px;
   text-align: center;
 }
 
@@ -714,8 +711,7 @@ ul { list-style: none; }
 .timer__value {
   display: block;
   font-family: var(--font-mono);
-  /* sized with the units' padding to add back the row's lost height */
-  font-size: clamp(26px, min(5.6vw, 6.2vh), 60px);
+  font-size: clamp(22px, min(4vw, 4.6vh), 46px);
   font-weight: 500;
   line-height: 1;
   font-variant-numeric: tabular-nums;
