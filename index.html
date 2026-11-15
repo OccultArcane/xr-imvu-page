@@ -800,9 +800,21 @@
     var eyebrow = document.getElementById("creator-status");
     var statusEl = document.getElementById("creator-state");
 
+    /* away from a machine that can run the watcher it starts hidden, so a static
+       host never flashes a dash where a reading would go */
+    if (eyebrow && !CAN_READ_LIVE) eyebrow.hidden = true;
+
     /* the watcher polls every 30s, so three minutes without a stamp means the
        reading has stopped being refreshed: a dead task must not look confident */
     var STALE_AFTER = 180;
+
+    /* the plate is a local instrument. Only this machine runs the watcher, so
+       only this machine can keep a reading fresh; on a static host the file it
+       reads is a frozen copy, and a plate that can only ever say "stale" is
+       worse than no plate. Locally it stays visible even when the reading goes
+       stale, because there a dead watcher is worth seeing. */
+    var CAN_READ_LIVE = location.protocol === "file:" ||
+      /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(location.hostname);
 
     /* every blinking dot shares one beat. A CSS animation starts whenever its
        own element did, and the plate only starts once the status reads creating,
@@ -828,6 +840,10 @@
       if (!value || stale) status = "unknown";
       var since = isFinite(at) ? new Date(at).toLocaleTimeString() : "";
       if (eyebrow) {
+        /* nothing fresh to report and no local watcher to blame: take the whole
+           thing off the page rather than leave it claiming a dead reading */
+        eyebrow.hidden = !(CAN_READ_LIVE || status !== "unknown");
+        if (eyebrow.hidden) return;
         eyebrow.dataset.status = status;
         /* a hand-set label is not a reading: the dot goes hollow and says why */
         eyebrow.dataset.manual = manual ? "true" : "false";

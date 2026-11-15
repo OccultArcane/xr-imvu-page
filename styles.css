@@ -387,6 +387,10 @@ ul { list-style: none; }
   color: #dcdce4;
 }
 
+/* hidden outright on a static host: `.eyebrow` sets its own display, so the
+   browser's [hidden] rule alone would not win */
+.eyebrow[hidden] { display: none; }
+
 /* the dot carries the creator's own status, read from assets/status.json. The
    dim default is the state before the file has answered and after its stamp
    goes stale: a still, unlit dot that claims nothing */
