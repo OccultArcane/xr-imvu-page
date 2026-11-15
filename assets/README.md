@@ -211,6 +211,8 @@ After each save the script re-reads the page and compares the textarea: a save t
     python tools/embed-page-in-products.py --ids 76499972 --apply
     python tools/embed-page-in-products.py --text '<b>Made to order.</b> {{embed}}' --apply
     python tools/embed-page-in-products.py --text-file copy.html --apply
+    python tools/embed-page-in-products.py --catalogue assets/catalogue.json --apply
+    python tools/embed-page-in-products.py --preview size-check.html --height 700
 
 Puts the published page inside each product's description as an iframe, so a shop listing carries the site itself rather than a picture of it. It is the description rewriter's machinery with a different body: same editor, same CSRF handling, same cookie file, same backups (`%TEMP%\xr-description-backups\<id>.html`), same read-back confirmation and the same exit codes.
 
@@ -221,3 +223,17 @@ The whole region is wrapped in `<!-- xr-embed:start -->` … `<!-- xr-embed:end 
 Whether IMVU keeps an iframe is not something the script can promise: the editor may sanitise markup on save. That is why every product is re-read and compared after the post — a stripped frame is reported as `NOT saved` and counted as a failure (exit 3), not as a success. If that happens across the board, the link under the frame is what visitors still get, and the backups are how the pass is undone.
 
 `tools/test_update_descriptions.py` covers it too: that every product gets exactly one frame, that a second run replaces rather than stacks, that a dry run posts nothing, that `--height` reaches the markup, that `{{embed}}` places the frame inside your copy, that copy without a placeholder puts the frame after it, that new copy replaces the old copy, and that a lost session stops the run before anything is written.
+
+## Listing every product
+
+    python tools/list-products.py                  # every page of the shop
+    python tools/list-products.py --max-pages 5     # stop early
+
+`tools/refresh-products.py` reads the shopfront only far enough to fill the releases row — eight pages at most, newest handful into `products.json`. This walks the same pages to the end and writes everything, which is what a bulk pass over every product needs. The shopfront is public, server-rendered HTML, so no session and no browser are involved; it is the same fetch the hourly refresh already does.
+
+It stops at the first page that comes back empty, drops a listing that appears twice, and stops early if a page adds nothing new rather than paging the same shop forever. Output is `assets/catalogue.json`: `id`, `name`, `price`, `url`, `image`, newest first as the shop orders them, plus every id on stdout. At the time of writing that is **305 products over 13 pages**. The file is gitignored — a snapshot for a bulk pass, not something the page serves.
+
+    python tools/list-products.py
+    python tools/embed-page-in-products.py --catalogue assets/catalogue.json --apply
+
+`--preview` writes the frame to a page of its own at whatever `--height` you give it, so the sizing can be judged in a browser against the product panel without saving anything to any product, and without a session.

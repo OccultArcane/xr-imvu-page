@@ -338,6 +338,18 @@ class EmbeddingThePage(EditorHarness):
         self.assertNotIn("first version", text)
         self.assertEqual(text.count(self.embed.START), 1)
 
+    def test_a_catalogue_supplies_the_ids(self):
+        catalogue = os.path.join(self.tmp, "catalogue.json")
+        with open(catalogue, "w", encoding="utf-8") as handle:
+            json.dump([{"id": "111"}, {"id": "333"}], handle)
+
+        code, out = self.run_embed("--catalogue", catalogue, "--apply")
+
+        self.assertEqual(code, 0, out)
+        self.assertIn("2 product(s) from", out)
+        self.assertIn(self.embed.START, self.state.descriptions["111"])
+        self.assertNotIn(self.embed.START, self.state.descriptions["222"], "222 was not in the catalogue")
+
     def test_a_session_that_is_gone_stops_the_run(self):
         self.state.formless = {"111"}
 

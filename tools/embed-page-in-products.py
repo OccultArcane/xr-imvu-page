@@ -36,6 +36,7 @@ Exit codes: 0 everything done, 1 nothing to do or a page could not be parsed,
 
 import argparse
 import importlib.util
+import json
 import os
 import sys
 import time
@@ -132,6 +133,11 @@ def main():
                       help="a file whose contents are that copy")
     parser.add_argument("--ids", nargs="+", metavar="ID",
                         help="products to touch (default: every id in assets/products.json)")
+    parser.add_argument("--catalogue", metavar="PATH",
+                        help="take the ids from a catalogue written by tools/list-products.py")
+    parser.add_argument("--preview", metavar="PATH",
+                        help="write a local page showing the frame at this size, and stop "
+                             "(needs no session)")
     parser.add_argument("--cookie-file", default=editor.DEFAULT_COOKIE,
                         help="file holding the signed-in cookie (never printed)")
     parser.add_argument("--backup-dir", default=editor.DEFAULT_BACKUP,
@@ -157,13 +163,41 @@ def main():
         with open(args.text_file, encoding="utf-8") as handle:
             text = handle.read()
 
+    # sizing is the one thing you cannot judge from the script's output, so this
+    # writes the frame to a page of its own and needs no session at all
+    if args.preview:
+        here = args.preview if os.path.isabs(args.preview) else os.path.join(ROOT, args.preview)
+        with open(here, "w", encoding="utf-8") as handle:
+            handle.write(
+                "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n"
+                "<title>embed preview %dpx</title>\n"
+                "<style>body{background:#050507;color:#8a8a96;font:12px ui-monospace,monospace;"
+                "margin:0;padding:16px}figure{margin:0}</style></head>\n"
+                "<body>\n<figure>\n%s\n<figcaption style=\"margin-top:8px\">"
+                "the frame is %dpx tall at this window's width — resize the window to "
+                "match the product panel\n</figcaption>\n</figure>\n</body></html>\n"
+                % (args.height, block(args.url, args.height, text), args.height)
+            )
+        print("preview written to %s" % here)
+        return 0
+
     try:
         cookie = editor.load_cookie(args.cookie_file)
     except editor.SessionMissing as exc:
         print("no session: %s" % exc)
         return 2
 
-    ids = args.ids or editor.product_ids_from_json(os.path.join(ROOT, "assets", "products.json"))
+    ids = args.ids or []
+    if not ids and args.catalogue:
+        path = args.catalogue if os.path.isabs(args.catalogue) else os.path.join(ROOT, args.catalogue)
+        if not os.path.exists(path):
+            print("no such catalogue: %s (run tools/list-products.py first)" % path)
+            return 1
+        with open(path, encoding="utf-8") as handle:
+            ids = [str(item.get("id")) for item in json.load(handle) if item.get("id")]
+        print("catalogue: %d product(s) from %s" % (len(ids), path))
+    if not ids:
+        ids = editor.product_ids_from_json(os.path.join(ROOT, "assets", "products.json"))
     if not ids:
         print("nothing to do: no product ids given and assets/products.json is empty")
         return 1

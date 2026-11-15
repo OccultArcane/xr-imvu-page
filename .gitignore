@@ -2,8 +2,12 @@
 # the session cookie now lives outside the project; this covers a stray copy
 *.cookies
 
-# a hand-set status label and other local scratch
-assets/status.override.txt
+  # a hand-set status label and other local scratch
+  assets/status.override.txt
+  
+  # every product in the shop, as read at one moment: an input to a bulk pass,
+  # not something the page serves
+  assets/catalogue.json
 
 # the webhook that gets told when the label changes — a credential, never committed
 assets/notify.url

@@ -21,6 +21,7 @@ SUITES = [
     ("worker unit tests", ["node", "--test", "worker/"]),
     ("watcher tests", [sys.executable, "tools/test_track_status.py"]),
     ("description tests", [sys.executable, "tools/test_update_descriptions.py"]),
+    ("catalogue walk", [sys.executable, "tools/test_catalogue.py"]),
     ("watcher/Worker parity", [sys.executable, "tools/test_settle_parity.py"]),
     ("local D1 harness", [sys.executable, "tools/check_worker_d1.py"]),
 ]
