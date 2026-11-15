@@ -19,6 +19,10 @@
   /* and the ring itself: one 1px red circle with the middle left dark. Every
      red dot reads this, so no two of them can drift apart */
   --red-ring: inset 0 0 0 1px #ff2a45, 0 0 10px rgba(255, 42, 69, 0.85);
+  /* every dot sits low against uppercase: a line box centres on ascenders and
+     descenders, the letters on their own middle. One lift for all of them, in em
+     so it follows each dot's type size */
+  --dot-lift: -0.12em;
   --chrome: #d7dbe2;
 
   /* full-page background plate */
@@ -406,10 +410,8 @@ ul { list-style: none; }
      only differs by that colour and by how brightly it glows */
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--dot, #3a3a43), 0 0 10px var(--dot, #3a3a43);
-  /* a line box centres on ascenders and descenders, so a circle centred in it
-     sits low against uppercase: lift it onto the capitals' own centre (~1.3px at
-     11px, which this keeps at any size) */
-  transform: translateY(-0.12em);
+  /* onto the capitals' centre, like every other dot (see --dot-lift) */
+  transform: translateY(var(--dot-lift));
   transition: background 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1009,6 +1011,8 @@ ul { list-style: none; }
      every red dot on the page is one identical open circle */
   background: transparent;
   box-shadow: var(--red-ring);
+  /* one lift for every dot on the page, so none of them sits low */
+  transform: translateY(var(--dot-lift));
 }
 
 @media (prefers-reduced-motion: no-preference) {
