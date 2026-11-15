@@ -735,7 +735,20 @@ ul { list-style: none; }
 .releases {
   grid-area: releases;
   margin-top: 0;
-  padding: clamp(9px, 1.3vh + 0.2vw, 18px);
+  /* the band absorbs the 33px the 5:4 row gave back: the frames are shorter than
+     the old 196px tiles and the countdown keeps its original size, so the band
+     takes the difference as breathing room. --band-air is that inset, and the
+     row uses it too, so the air above the row matches the air below it — the row
+     reads centred in its band instead of sitting high. Vertical only: widening
+     the padding would narrow the row and shrink the cards. */
+  --band-air: calc(clamp(9px, 1.3vh + 0.2vw, 18px) + 9.8px);
+  /* the band holds exactly two children, so the gap under the header is the same
+     value as the padding around them: air above the header, between header and
+     row, and under the row all come from --band-air */
+  display: flex;
+  flex-direction: column;
+  gap: var(--band-air);
+  padding: var(--band-air) clamp(9px, 1.3vh + 0.2vw, 18px);
   border: 1px solid var(--line);
   /* the same plate as the drop band, so all three bands in the panel match */
   border-radius: 4px;
@@ -794,9 +807,7 @@ ul { list-style: none; }
   --per-view: 6;
   display: flex;
   gap: var(--card-gap);
-  /* 2px of headroom for the tile's hover lift, taken back off the top margin
-     so the panel is exactly as tall as it was */
-  margin: calc(clamp(8px, 1.2vw, 14px) - 2px) 0 0;
+  margin: 0;
   padding: 2px 0 0;
   overflow-x: auto;
   overflow-y: hidden;
