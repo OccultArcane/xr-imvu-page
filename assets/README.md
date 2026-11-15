@@ -218,6 +218,8 @@ Puts the published page inside each product's description as an iframe, so a sho
 
 The copy is yours to supply: `--text` takes it on the command line, `--text-file` reads it from a file (handy for HTML with newlines). `{{embed}}` in that copy is where the frame goes; without a placeholder the copy is written first and the frame follows it, so both arrangements work. Without either flag the product keeps the text it had and only gains the frame.
 
+`--replace` is the other arrangement: the description becomes the frame and nothing else, dropping whatever the product used to say. It prints how many characters it drops, and the backup is still written first, so nothing is lost that cannot be put back. Without the flag the old text is kept above the frame.
+
 The whole region is wrapped in `<!-- xr-embed:start -->` … `<!-- xr-embed:end -->`, so the script is safe to run repeatedly — the region is replaced where it stands, which means a re-run with new copy swaps the old copy out rather than leaving both, while any text outside the markers is untouched. `--url` changes what is embedded, `--height` the frame's height (640px by default), and the frame always carries a plain link under it.
 
 Whether IMVU keeps an iframe is not something the script can promise: the editor may sanitise markup on save. That is why every product is re-read and compared after the post — a stripped frame is reported as `NOT saved` and counted as a failure (exit 3), not as a success. If that happens across the board, the link under the frame is what visitors still get, and the backups are how the pass is undone.

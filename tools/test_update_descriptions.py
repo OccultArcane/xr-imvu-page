@@ -344,6 +344,38 @@ class EmbeddingThePage(EditorHarness):
         self.assertNotIn("first version", text)
         self.assertEqual(text.count(self.embed.START), 1)
 
+    def test_replace_drops_what_was_there(self):
+        code, out = self.run_embed("--ids", "111", "--replace", "--apply")
+
+        self.assertEqual(code, 0, out)
+        text = self.state.descriptions["111"]
+        self.assertEqual(self.original["111"], "old one")
+        self.assertNotIn("old one", text)
+        self.assertTrue(text.strip().startswith(self.embed.START))
+        self.assertTrue(text.strip().endswith(self.embed.END))
+        self.assertIn("iframe", text)
+        self.assertIn("drops", out)
+
+    def test_replace_keeps_that_products_backup(self):
+        self.run_embed("--ids", "111", "--replace", "--apply")
+
+        with open(os.path.join(self.backup, "111.html"), encoding="utf-8") as opened:
+            self.assertEqual(opened.read(), "old one")
+
+    def test_replace_is_idempotent(self):
+        self.run_embed("--ids", "111", "--replace", "--apply")
+        code, out = self.run_embed("--ids", "111", "--replace", "--apply")
+
+        self.assertEqual(code, 0, out)
+        text = self.state.descriptions["111"]
+        self.assertEqual(text.count(self.embed.START), 1)
+        self.assertIn("already embeds it", out)
+
+    def test_without_replace_the_old_text_stays(self):
+        self.run_embed("--ids", "111", "--apply")
+
+        self.assertIn("old one", self.state.descriptions["111"])
+
     def test_preview_writes_the_frame_and_needs_no_session(self):
         path = os.path.join(self.tmp, "preview.html")
 

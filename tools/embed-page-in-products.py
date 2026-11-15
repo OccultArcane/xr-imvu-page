@@ -103,15 +103,19 @@ def block(url, height, text=None):
     return "\n".join([START, inside, END])
 
 
-def with_embed(description, url, height, text=None):
+def with_embed(description, url, height, text=None, replace=False):
     """The description with exactly one marked region in it.
 
     A marked region is replaced where it stands — so a re-run with different
     copy replaces the old copy instead of leaving it behind — and a description
-    without one has the region appended, never stacked twice.
+    without one has the region appended, never stacked twice. With replace, the
+    description becomes the region and nothing else: whatever was there is gone,
+    which is what a product page should carry when the frame is the description.
     """
     fresh = block(url, height, text)
     current = description or ""
+    if replace:
+        return fresh
     if START in current and END in current:
         head, rest = current.split(START, 1)
         _, tail = rest.split(END, 1)
@@ -147,6 +151,9 @@ def main():
                         help="where each replaced description is saved first")
     parser.add_argument("--delay", type=float, default=2.0,
                         help="seconds between products (default: 2)")
+    parser.add_argument("--replace", action="store_true",
+                        help="discard the existing description instead of keeping it "
+                             "above the frame (backups are still written first)")
     parser.add_argument("--apply", action="store_true",
                         help="actually save; without this the run is a dry run")
     parser.add_argument("--quiet", action="store_true", help="only report changes and errors")
@@ -211,6 +218,7 @@ def main():
     if text is not None:
         print("copy: %d chars, " % len(text.strip())
               + ("frame placed at {{embed}}" if "{{embed}}" in text else "frame appended below it"))
+    print("existing text: %s" % ("dropped" if args.replace else "kept above the frame"))
     print("products: %d" % len(ids))
 
     os.makedirs(args.backup_dir, exist_ok=True)
@@ -228,12 +236,14 @@ def main():
             continue
 
         before = field.value
-        target = with_embed(before, args.url, args.height, text)
+        target = with_embed(before, args.url, args.height, text, args.replace)
         unchanged = target.strip() == (before or "").strip()
 
         if not args.quiet or not unchanged:
             print("[%d/%d] %s  %s" % (index, len(ids), product_id,
                                       "already embeds it" if unchanged else "will embed"))
+            if args.replace and (before or "").strip() and not unchanged:
+                print(editor.line("drops", "%d chars of the old description" % len(before.strip())))
 
         if unchanged:
             continue
