@@ -48,7 +48,7 @@ ROOT = os.path.dirname(HERE)
 PAGE = "https://occultarcane.github.io/xr-imvu-page/"
 START = "<!-- xr-embed:start -->"
 END = "<!-- xr-embed:end -->"
-DEFAULT_HEIGHT = 640
+DEFAULT_HEIGHT = 600
 
 
 def load_editor():
@@ -69,14 +69,17 @@ editor = load_editor()
 
 
 def frame(url, height):
-    """The frame itself, with a link under it for whatever strips iframes."""
+    """The frame as settled on for the product panel, plus a link for whatever
+    strips iframes.
+
+    The height is a plain number: HTML's width/height attributes do not take
+    units, so "600px" there is an invalid value some browsers ignore, falling
+    back to 150px. The width is full, scrolling is off, the border is gone.
+    """
     return "\n".join(
         [
-            '<div style="position:relative;width:100%;max-width:960px;margin:0 auto;">',
-            '  <iframe src="%s" title="XR — Premium Creator" loading="lazy" '
-            'allowfullscreen style="width:100%%;height:%dpx;border:0;'
-            'background:#050507;display:block;"></iframe>' % (url, height),
-            "</div>",
+            '<iframe src="%s" title="XR — Premium Creator" width="100%%" height="%d" '
+            'frameborder="0" scrolling="no"></iframe>' % (url, height),
             '<p style="text-align:center;margin:10px 0 0;">'
             '<a href="%s" target="_blank" rel="noopener">open XR in a new tab</a></p>' % url,
         ]
@@ -174,8 +177,9 @@ def main():
                 "<style>body{background:#050507;color:#8a8a96;font:12px ui-monospace,monospace;"
                 "margin:0;padding:16px}figure{margin:0}</style></head>\n"
                 "<body>\n<figure>\n%s\n<figcaption style=\"margin-top:8px\">"
-                "the frame is %dpx tall at this window's width — resize the window to "
-                "match the product panel\n</figcaption>\n</figure>\n</body></html>\n"
+                "the frame is %dpx tall at this window's width — resize the window to match "
+                "the panel; anything past the frame is clipped, not scrollable"
+                "\n</figcaption>\n</figure>\n</body></html>\n"
                 % (args.height, block(args.url, args.height, text), args.height)
             )
         print("preview written to %s" % here)

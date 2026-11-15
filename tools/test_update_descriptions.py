@@ -310,7 +310,13 @@ class EmbeddingThePage(EditorHarness):
     def test_the_height_follows_the_flag(self):
         self.run_embed("--ids", "111", "--height", "900", "--apply")
 
-        self.assertIn("height:900px", self.state.descriptions["111"])
+        self.assertIn('height="900"', self.state.descriptions["111"])
+
+    def test_the_frame_is_the_panel_one(self):
+        self.run_embed("--ids", "111", "--apply")
+
+        text = self.state.descriptions["111"]
+        self.assertIn('width="100%" height="600" frameborder="0" scrolling="no"', text)
 
     def test_the_copy_goes_in_with_the_frame_where_marked(self):
         code, out = self.run_embed(
@@ -337,6 +343,18 @@ class EmbeddingThePage(EditorHarness):
         self.assertIn("second version", text)
         self.assertNotIn("first version", text)
         self.assertEqual(text.count(self.embed.START), 1)
+
+    def test_preview_writes_the_frame_and_needs_no_session(self):
+        path = os.path.join(self.tmp, "preview.html")
+
+        code, out = self.run_embed("--preview", path, "--height", "700")
+
+        self.assertEqual(code, 0, out)
+        with open(path, encoding="utf-8") as opened:
+            page = opened.read()
+        self.assertIn('height="700"', page)
+        self.assertIn(self.embed.PAGE, page)
+        self.assertEqual(self.state.posts, [])
 
     def test_a_catalogue_supplies_the_ids(self):
         catalogue = os.path.join(self.tmp, "catalogue.json")
