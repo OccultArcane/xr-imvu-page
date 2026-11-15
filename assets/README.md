@@ -130,3 +130,22 @@ Run it on a schedule and the row stays current: the page re-reads `products.json
       /tr "\"C:\path\to\pythonw.exe\" \"%CD%\tools\refresh-products.py\""
 
 On a host rather than a desktop, the same command is the whole cron/Actions step — it needs Python 3 and Pillow.
+
+## Rewriting product descriptions
+
+IMVU publishes no API for descriptions, so `tools/update-product-descriptions.py` drives the creator editor at `https://www.imvu.com/creator/edit_product_html/<id>` — the page you would use by hand. It reads that page's form, keeps every field exactly as found (the CSRF token included), replaces only the description textarea and posts the form back, which is the same thing the Save button does. Both urlencoded and multipart forms are handled, because the editor may carry an image field; file and button inputs are never re-sent.
+
+The editor needs a signed-in session, and does not say so politely: without a cookie it answers **200 with the public IMVU homepage**, no form and no redirect. That is why the script treats "no form on the page" as "not signed in" and stops, rather than reporting a product as done. It checks one product before touching the rest, and exits 2.
+
+The cookie comes from a file — `%LOCALAPPDATA%\XR\session.cookies` by default — holding either a raw `name=value; name=value` string or a whole `Cookie:` header copied from a signed-in browser request. The script never prints it, logs it or writes it into a report, and `.gitignore` covers any stray `*.cookies`.
+
+    python tools/update-product-descriptions.py --copy-from 76546193
+    python tools/update-product-descriptions.py --copy-from 76546193 --apply
+    python tools/update-product-descriptions.py --description-file new.html --apply
+    python tools/update-product-descriptions.py --ids 76546193 76508289 --apply
+
+Without `--apply` it posts nothing; it prints the old and new text per product and stops. With it, each run first copies the description it is about to replace into `%TEMP%\xr-description-backups\<id>.html`, so a bulk edit that goes wrong can be undone by pointing `--description-file` at the backup. `--ids` defaults to every id in `assets/products.json`; `--copy-from` uses one product's current description as the text to write everywhere, so the shop can be brought to a single description without a file.
+
+After each save the script re-reads the page and compares the textarea: a save that did not stick is reported as `NOT saved` and counted as a failure (exit 3), not as success.
+
+`tools/test_update_descriptions.py` covers this against a loopback fake editor — that the form and CSRF token are found, that nothing is posted in a dry run, that a page with no form is read as a missing session, and that multipart forms post too. Python 3 only, no Pillow.
