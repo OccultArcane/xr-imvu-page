@@ -18,6 +18,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SUITES = [
+    ("creator cards", [sys.executable, "tools/test_creator_cards.py"]),
     ("worker unit tests", ["node", "--test", "worker/"]),
     ("watcher tests", [sys.executable, "tools/test_track_status.py"]),
     ("description tests", [sys.executable, "tools/test_update_descriptions.py"]),

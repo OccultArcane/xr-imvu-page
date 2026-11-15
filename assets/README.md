@@ -9,9 +9,10 @@
 | `social/pinterest.svg` | Pinterest brand mark | Top bar |
 | `social/discord.svg` | Discord brand mark | Top bar (dimmed — no invite yet) |
 | `creators/chokinglotus.jpg` | Creator avatar, shipped copy | Creator row |
-| `creators/numen.jpg` | Creator avatar, shipped copy | Creator row |
 | `creators/g59.jpg` | Creator avatar, shipped copy | Creator row |
+| `creators/numen.jpg` | Creator avatar, shipped copy | Creator row |
 | `creators/scissors.jpg` | Creator avatar, shipped copy | Creator row |
+| `creators/ibriprofen.jpg` | Creator avatar, shipped copy | Creator row |
 | `creators.json` | Creator id → live IMVU picture | Reference for the avatar URLs |
 | `products.json` | The IMVU shop's eight newest items, newest first | Rendered into the releases row at load |
 | `status.json` | The creator's presence label | Top bar — the status dot and its word |
@@ -117,7 +118,7 @@ Pinned mark → top bar (clock, status, channels) → notice strip → launch pa
 
 - **Countdown** — the weekly drop, every Friday at local midnight. The target is derived from the clock (`nextDrop()` in `index.html`), so it rolls over to the next Friday the moment a drop opens; the label switches to "Drop day" on the day itself. Change `DROP_WEEKDAY` (5 = Friday, 0 = Sunday) or `DROP_HOUR` to move it.
 - **Product tiles** — rendered from `products.json` at load: name, price in credits and the link into the shop, with the rebuilt WebP in `assets/products/`. Six cards show on the desktop row and two on a phone; past that the row clones itself and loops.
-- **Creators** — `chokinglotus`, `Numen`, `G59` and `scissors`, each linking to their IMVU shop by manufacturer id. The shipped JPEG paints immediately; their current IMVU upload replaces it once it decodes, so the frame never blanks.
+- **Creators** — `chokinglotus`, `G59`, `Numen`, `scissors` and `ibriprofen`, in that order, each linking to their IMVU shop by manufacturer id: `272737258`, `119374898`, `179356122`, `345204947` and `114942714`. The shipped JPEG paints immediately; their current IMVU upload replaces it once it decodes, so the frame never blanks. That live picture is IMVU's own `catalog/image_avatar.php?cid=<shop id>`, so each card's picture URL carries the same id as its shop link — `tools/test_creator_cards.py` fails the build when those disagree. Add another with `python tools/creator-lookup.py <username> --insert`, which reads the id from their own avatar page rather than trusting a number typed by hand.
 - **Socials** — Pinterest and Instagram point at the real accounts. Discord has no invite in the source project either, so it renders dimmed and unclickable.
 - **Clock** — `[ HH:MM:SS ]` in the bracket style, from the local system clock.
 

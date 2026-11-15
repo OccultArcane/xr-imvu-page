@@ -16,8 +16,8 @@ picture URL, and a ready-to-paste <li> block with the card's brackets, classes
 and img attributes already in place.
 
 `--save` downloads that picture, centre-crops it to the card's 13:18 frame and
-writes assets/creators/<name>.jpg (104x144), which is exactly what the other
-three cards ship. `--insert` goes one step further and drops the card into the
+  writes assets/creators/<name>.jpg (104x144), which is exactly what the rest of
+  the row ships. `--insert` goes one step further and drops the card into the
 creator row in index.html, saving the portrait on the way; if the creator is
 already there it says so and leaves the file untouched.
 
@@ -46,6 +46,9 @@ LIST_OPEN = re.compile(r'<ul class="creator-list">')
 
 AVATAR_PAGE = "https://avatars.imvu.com/{name}"
 SHOP_URL = "https://www.imvu.com/shop/web_search.php?manufacturers_id={mid}"
+# the picture the card swaps in, keyed by the member id rather than by a
+# filename, so every card's live URL carries the same id as its shop link
+AVATAR_IMAGE = "https://www.imvu.com/catalog/image_avatar.php?cid={mid}"
 
 # what the card shows: the shipped copy is twice the box, so it stays sharp
 CROP = (104, 144)
@@ -248,7 +251,8 @@ def main():
         print("shop      none (no storefront under this member id)")
     print("picture   %s" % picture)
 
-    src, live, slug = "", picture, ""
+    src, slug = "", ""
+    live = AVATAR_IMAGE.format(mid=mid)
     if args.save:
         try:
             src, slug = save_picture(picture, name)
