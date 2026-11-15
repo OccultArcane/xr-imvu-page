@@ -1,0 +1,31 @@
+name: IMVU probe
+
+# Manual only, on purpose: this asks whether IMVU serves a GitHub runner the same
+# way it serves the desktop. It reads index.html to find the targets and writes
+# nothing, so it cannot touch the site.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: What this runner looks like from outside
+        run: |
+          echo "egress IP: $(curl -s --max-time 10 https://api.ipify.org || echo unknown)"
+          python -c "import sys; print('python: %s' % sys.version.split()[0])"
+
+      - name: Probe IMVU
+        run: python tools/probe-imvu.py
