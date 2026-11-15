@@ -156,7 +156,7 @@ Use this rather than `python -m http.server`. It stamps the page it serves with 
 
 ## Keeping the releases current
 
-IMVU's shopfront is server-rendered and sends no CORS headers, so the page cannot read it directly. `tools/refresh-products.py` reads it instead — it pulls the newest listings for the XR shop (manufacturer `106440837`), rebuilds each thumbnail as a 300×240 WebP and rewrites `products.json` atomically. A Windows scheduled task, **XR product refresh**, runs it hourly, so a new listing reaches the page within the hour (the page re-reads `products.json` every 60s, so it appears as soon as the file changes). Each run appends one line to `%TEMP%\xr-products.log`.
+IMVU's shopfront is server-rendered and sends no CORS headers, so the page cannot read it directly. `tools/refresh-products.py` reads it instead — it pulls the newest listings for the XR shop (manufacturer `106440837`), rebuilds each thumbnail as a 300×240 WebP and rewrites `products.json` atomically. A Windows scheduled task, **XR product refresh**, runs it hourly, so a new listing is in `products.json` within the hour. That file reaches the published page only when it is pushed — Pages serves the repo, and nothing here commits — and the page re-reads `products.json` every 60s, so it appears within a minute of that push. Each run appends one line to `%TEMP%\xr-products.log`.
 
 The task itself runs `tools/refresh-hourly.py`, not this script directly: the page also depends on the creator pictures, whose URLs carry a token that only goes stale silently, so one action runs both refreshes in order and neither can take the other down with it.
 
