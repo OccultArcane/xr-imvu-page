@@ -8,11 +8,6 @@
 | `social/instagram.svg` | Instagram brand mark | Top bar |
 | `social/pinterest.svg` | Pinterest brand mark | Top bar |
 | `social/discord.svg` | Discord brand mark | Top bar (dimmed — no invite yet) |
-| `creators/chokinglotus.jpg` | Creator avatar, shipped copy | Creator row |
-| `creators/g59.jpg` | Creator avatar, shipped copy | Creator row |
-| `creators/numen.jpg` | Creator avatar, shipped copy | Creator row |
-| `creators/scissors.jpg` | Creator avatar, shipped copy | Creator row |
-| `creators/ibriprofen.jpg` | Creator avatar, shipped copy | Creator row |
 | `creators.json` | Creator id → live IMVU picture | Reference for the avatar URLs |
 | `products.json` | The IMVU shop's eight newest items, newest first | Rendered into the releases row at load |
 | `status.json` | The creator's presence label | Top bar — the status dot and its word |
@@ -138,9 +133,11 @@ An earlier layout put the caption over the artwork behind a gradient scrim, and 
 
 `tools/creator-lookup.py` reads a username's IMVU pages for you and prints a card ready to paste into `.creator-list`:
 
-    python tools/creator-lookup.py scissors --save
+    python tools/creator-lookup.py scissors
 
-It prints the member id, the shop link, how many listings that shop holds, the live picture URL and the `<li>` block. `--insert` skips the copy-and-paste: it saves the portrait and drops the card at the end of `.creator-list` in `index.html` (or the file given with `--index`), writing through a temporary file and keeping the page's own line endings. Re-running it for a creator already in the row reports that and leaves the page untouched. `--save` downloads the portrait, centre-crops it to the card's 13:18 frame and writes `assets/creators/<name>.jpg` (104×144) — the shipped copy the other cards use. The picture is taken from the profile's own `avBigPic` block, because the same page also lists other members' thumbnails. If the shop that answers to that id belongs to a different name, the member has no storefront and the script links their profile instead.
+It prints the member id, the shop link, how many listings that shop holds, the picture URL and the `<li>` block. `--insert` skips the copy-and-paste: it drops the card at the end of `.creator-list` in `index.html` (or the file given with `--index`), writing through a temporary file and keeping the page's own line endings. Re-running it for a creator already in the row reports that and leaves the page untouched.
+
+The card's `src` is the profile's own picture, taken from its `avBigPic` block because the same page also lists other members' thumbnails — an animated avatar comes back as a `.gif` and keeps moving, so a new card animates without anything else being done. Nothing is downloaded: there is no copy of the portrait shipped beside the page, so there is no old picture left for a newer one to be swapped over. If the profile hands back a picture that carries no member id (a Snap photo doesn't), the card uses `image_avatar.php?cid=<id>` instead, which is static but addressed by the id. If the shop that answers to that id belongs to a different name, the member has no storefront and the script links their profile instead.
 
 ## Previewing locally
 
@@ -174,6 +171,15 @@ Run it on a schedule and the row stays current: the page re-reads `products.json
       /tr "\"C:\path\to\pythonw.exe\" \"%CD%\tools\refresh-products.py\""
 
 On a host rather than a desktop, the same command is the whole cron/Actions step — it needs Python 3 and Pillow.
+
+## Keeping the creator pictures current
+
+The animated avatars IMVU serves cannot be addressed by id alone: their filenames carry a token (`avatars/119374898_20348436876a9f21e11da5a.gif`) that only the creator's own avatar page shows. `catalog/image_avatar.php?cid=<id>` *is* addressable by id, but it always answers with a static 80x110 JPEG. So each card's id is resolved back to a picture by a small tool:
+
+    python tools/refresh-creators.py           # rewrite the cards that moved
+    python tools/refresh-creators.py --check    # report only
+
+It reads every card's shop id, fetches that creator's avatar page, and picks the file whose name starts with the id — animated `.gif` first — rewriting that card's `src` in place. A card that already points at a working animation is kept as it is when the profile shows nothing readable (private profiles, and accounts that upload a Snap photo, have no id-carrying file), because falling back to the id endpoint would swap a working animation for a still. Only when neither exists does the static JPEG take over. Run it on the same hourly schedule as the product refresh and the row follows the creators by itself; `tools/test_refresh_creators.py` covers the picking rules offline, against fake pages.
 
 ## Rewriting product descriptions
 

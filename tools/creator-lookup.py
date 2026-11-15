@@ -2,24 +2,26 @@
 """Look up an IMVU username and print everything a creator card needs.
 
 Adding a card by hand means hunting three separate IMVU pages for a manufacturer
-id, a shop link and a portrait, and the portrait is the easy one to get wrong:
-the avatar page also carries a strip of *other* members' thumbnails, so grabbing
+id, a shop link and a picture, and the picture is the easy one to get wrong: the
+avatar page also carries a strip of *other* members' thumbnails, so grabbing
 "the first picture" puts a stranger's face on the card. This script reads the
 member's own profile picture — the `avBigPic` image — and nothing else.
 
     python tools/creator-lookup.py scissors
-    python tools/creator-lookup.py scissors --save      # also write the shipped copy
     python tools/creator-lookup.py scissors --insert    # and add the card to index.html
 
-Output is the id, the shop link, how many listings the shop holds, the live
-picture URL, and a ready-to-paste <li> block with the card's brackets, classes
-and img attributes already in place.
+Output is the id, the shop link, how many listings the shop holds, the picture
+URL, and a ready-to-paste <li> block with the card's brackets, classes and img
+attributes already in place.
 
-`--save` downloads that picture, centre-crops it to the card's 13:18 frame and
-  writes assets/creators/<name>.jpg (104x144), which is exactly what the rest of
-  the row ships. `--insert` goes one step further and drops the card into the
-creator row in index.html, saving the portrait on the way; if the creator is
-already there it says so and leaves the file untouched.
+The card shows that URL directly; no copy of the portrait is shipped beside the
+page, so there is no stale picture for a newer one to be swapped over. When the
+profile hands back a picture that does not carry the member id — a Snap photo
+doesn't — the id-addressable `image_avatar.php?cid=` endpoint is used instead, so
+`tools/refresh-creators.py` can still follow the card.
+
+`--insert` drops the card at the end of the creator row in index.html; if the
+creator is already there it says so and leaves the file untouched.
 
 Exit code is 0 when the member and shop were found, 1 when the username could
 not be read or is not a member.
@@ -27,7 +29,6 @@ not be read or is not a member.
 
 import argparse
 import html
-import io
 import os
 import re
 import sys
@@ -35,10 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from PIL import Image
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CREATOR_DIR = os.path.join(ROOT, "assets", "creators")
 INDEX = os.path.join(ROOT, "index.html")
 
 # the row the card belongs in, and the tag that closes it
@@ -46,12 +44,9 @@ LIST_OPEN = re.compile(r'<ul class="creator-list">')
 
 AVATAR_PAGE = "https://avatars.imvu.com/{name}"
 SHOP_URL = "https://www.imvu.com/shop/web_search.php?manufacturers_id={mid}"
-# the picture the card swaps in, keyed by the member id rather than by a
-# filename, so every card's live URL carries the same id as its shop link
+# the picture the card shows when the profile hands back one that carries no id,
+# keyed by the member id so every card's URL matches its shop link
 AVATAR_IMAGE = "https://www.imvu.com/catalog/image_avatar.php?cid={mid}"
-
-# what the card shows: the shipped copy is twice the box, so it stays sharp
-CROP = (104, 144)
 
 HEADERS = {
     "User-Agent": (
@@ -64,18 +59,31 @@ HEADERS = {
 # the profile picture sits inside this block; the thumbnails below it are other
 # members, which is why the search is anchored here rather than on the page
 BIG_PIC_BLOCK = re.compile(r'id="avBigPic"(.*?)(?:id="avFriends"|</table>)', re.S)
-BIG_PIC_IMG = re.compile(r'<img[^>]+src="(https?://[^"]+)"')
+BIG_PIC_IMG = re.compile(r'<img[^>]+src="(https?://[^\"]+)"')
 MEMBER_ID = re.compile(r"olstatus_(\d+)_")
 SHOP_NAME = re.compile(r"Visit (.+?)'s Homepage")
 CARD_SPLIT = re.compile(r'(?=<div class="widget-product-wide)')
 CARD_TITLE = re.compile(r'title="([^"]*)"')
 
+# the member id as IMVU writes it into a picture URL: `?cid=` on the endpoint,
+# or the filename prefix on the per-image files
+CID = re.compile(r"[?&]cid=(\d+)")
+FILENAME_ID = re.compile(r"^(\d+)_")
 
-def fetch(url, binary=False):
+
+def fetch(url):
     request = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(request, timeout=40) as response:
-        raw = response.read()
-    return raw if binary else raw.decode("utf-8", "replace")
+        return response.read().decode("utf-8", "replace")
+
+
+def picture_id(url):
+    """The member id a picture URL belongs to, or '' when it carries none."""
+    found = CID.search(url)
+    if found:
+        return found.group(1)
+    named = FILENAME_ID.match(os.path.basename(url))
+    return named.group(1) if named else ""
 
 
 def member(name):
@@ -125,29 +133,7 @@ def shop(mid):
     return (name.group(1) if name else None), len(cards), titles
 
 
-def save_picture(picture, name):
-    """Centre-crop to the card's frame and write the shipped JPEG."""
-    image = Image.open(io.BytesIO(fetch(picture, binary=True))).convert("RGB")
-    width, height = image.size
-    target = CROP[0] / CROP[1]
-    if width / height > target:
-        new_width = int(height * target)
-        left = (width - new_width) // 2
-        image = image.crop((left, 0, left + new_width, height))
-    else:
-        new_height = int(width / target)
-        top = (height - new_height) // 2
-        image = image.crop((0, top, width, top + new_height))
-    image = image.resize(CROP, Image.LANCZOS)
-
-    os.makedirs(CREATOR_DIR, exist_ok=True)
-    slug = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-") or "creator"
-    path = os.path.join(CREATOR_DIR, slug + ".jpg")
-    image.save(path, "JPEG", quality=86, optimize=True, progressive=True)
-    return os.path.relpath(path, ROOT).replace("\\", "/"), slug
-
-
-def card(name, link, src, live):
+def card(name, link, src):
     """The markup block, indented to drop straight into .creator-list."""
     return """          <li>
             <a class="creator" href="{link}" target="_blank" rel="noopener noreferrer">
@@ -155,7 +141,6 @@ def card(name, link, src, live):
                 <img
                   class="creator__avatar"
                   src="{src}"
-                  data-live="{live}"
                   alt=""
                   width="52"
                   height="72"
@@ -167,10 +152,10 @@ def card(name, link, src, live):
                 </span>
               </span>
             </a>
-          </li>""".format(link=link, src=src, live=live, name=name)
+          </li>""".format(link=link, src=src, name=name)
 
 
-def insert_card(path, block, mid, slug):
+def insert_card(path, block, mid):
     """Drop the card at the end of the creator row.
 
     Writes through a temporary file so a half-written page is never left behind,
@@ -189,10 +174,7 @@ def insert_card(path, block, mid, slug):
         raise LookupError("the creator list is never closed in %s" % os.path.basename(path))
 
     row = text[opening.end():closing]
-    already = ("manufacturers_id=%s" % mid) in row
-    if slug:
-        already = already or ("creators/%s.jpg" % slug) in row
-    if already:
+    if ("manufacturers_id=%s" % mid) in row:
         return False, 0
 
     # sit the block on its own line above the closing tag, matching the gap the
@@ -214,14 +196,9 @@ def main():
 
     parser = argparse.ArgumentParser(description="Look up an IMVU creator's card details.")
     parser.add_argument("username", help="IMVU username, e.g. scissors")
-    parser.add_argument("--save", action="store_true", help="download the portrait into assets/creators/")
     parser.add_argument("--insert", action="store_true", help="add the card to the creator row in index.html")
     parser.add_argument("--index", default=INDEX, help="page to edit with --insert (default: index.html)")
     args = parser.parse_args()
-
-    # a card in the row needs its shipped picture, so inserting saves it too
-    if args.insert:
-        args.save = True
 
     name = args.username.strip()
     try:
@@ -249,28 +226,24 @@ def main():
             print("          %s" % title)
     else:
         print("shop      none (no storefront under this member id)")
-    print("picture   %s" % picture)
 
-    src, slug = "", ""
-    live = AVATAR_IMAGE.format(mid=mid)
-    if args.save:
-        try:
-            src, slug = save_picture(picture, name)
-            print("saved     %s" % src)
-        except Exception as error:
-            print("could not save the portrait: %s" % error, file=sys.stderr)
-            if args.insert:
-                return 1
+    # the profile's own picture is used as-is: it is already the creator's
+    # current one, and an animated avatar comes back as a .gif that keeps moving.
+    # Only a picture that carries no member id is replaced, because then nothing
+    # can follow the card back to this creator.
+    if picture_id(picture) == mid:
+        src = picture
+        print("picture   %s" % picture)
+    else:
+        src = AVATAR_IMAGE.format(mid=mid)
+        print("picture   %s (carries no member id; the card uses %s)" % (picture, src))
 
     link = SHOP_URL.format(mid=mid) if owns_shop else AVATAR_PAGE.format(name=urllib.parse.quote(name))
-    if not src:
-        src = "assets/creators/<name>.jpg"
-
-    markup = card(name, link, src, live)
+    markup = card(name, link, src)
 
     if args.insert:
         try:
-            changed, line = insert_card(args.index, markup, mid, slug)
+            changed, line = insert_card(args.index, markup, mid)
         except Exception as error:
             print("could not edit the page: %s" % error, file=sys.stderr)
             return 1

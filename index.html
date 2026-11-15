@@ -117,8 +117,7 @@
               <span class="creator__chip viewfinder">
                 <img
                   class="creator__avatar"
-                  src="assets/creators/chokinglotus.jpg"
-                  data-live="https://www.imvu.com/catalog/image_avatar.php?cid=272737258"
+                  src="https://www.imvu.com/catalog/image_avatar.php?cid=272737258"
                   alt=""
                   width="52"
                   height="72"
@@ -137,8 +136,7 @@
               <span class="creator__chip viewfinder">
                 <img
                   class="creator__avatar"
-                  src="assets/creators/g59.jpg"
-                  data-live="https://www.imvu.com/catalog/image_avatar.php?cid=119374898"
+                  src="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/119374898_20348436876a9f21e11da5a.gif"
                   alt=""
                   width="52"
                   height="72"
@@ -157,8 +155,7 @@
               <span class="creator__chip viewfinder">
                 <img
                   class="creator__avatar"
-                  src="assets/creators/numen.jpg"
-                  data-live="https://www.imvu.com/catalog/image_avatar.php?cid=179356122"
+                  src="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/179356122_20855017476ad93b5528ced.gif"
                   alt=""
                   width="52"
                   height="72"
@@ -177,8 +174,7 @@
               <span class="creator__chip viewfinder">
                 <img
                   class="creator__avatar"
-                  src="assets/creators/scissors.jpg"
-                  data-live="https://www.imvu.com/catalog/image_avatar.php?cid=345204947"
+                  src="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/345204947_5759020116af8540f13575.gif"
                   alt=""
                   width="52"
                   height="72"
@@ -197,8 +193,7 @@
               <span class="creator__chip viewfinder">
                 <img
                   class="creator__avatar"
-                  src="assets/creators/ibriprofen.jpg"
-                  data-live="https://www.imvu.com/catalog/image_avatar.php?cid=114942714"
+                  src="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/114942714_16374717496ae390cee7cca.jpg"
                   alt=""
                   width="52"
                   height="72"
@@ -823,16 +818,6 @@
 
       syncCreators();
     }
-
-    /* ---------- creator avatars: swap to the live picture once decoded ---------- */
-    document.querySelectorAll(".creator__avatar").forEach(function (img) {
-      var live = img.dataset.live;
-      if (!live) return;
-      var probe = new Image();
-      probe.referrerPolicy = "no-referrer";
-      probe.onload = function () { img.src = live; };
-      probe.src = live;
-    });
 
     /* ---------- the creator's own status ----------
        The dot and its word come from assets/status.json — or from whatever
