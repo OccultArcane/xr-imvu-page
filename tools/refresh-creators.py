@@ -153,11 +153,15 @@ def main():
         print("every creator card is already current (%d cards)" % len(cards(html)))
         return 0
 
-    for name, wanted in moved:
-        print("  %-14s %s" % (name, "animated" if wanted.lower().endswith(".gif") else "still"))
+    # one line, because it is the line the hourly wrapper logs: which cards moved
+    # and whether each kept an animation or took the still endpoint
+    moved_by = ", ".join(
+        "%s %s" % (name, "animated" if wanted.lower().endswith(".gif") else "still")
+        for name, wanted in moved
+    )
 
     if args.check:
-        print("%d card(s) would move; nothing written (--check)" % len(moved))
+        print("%d card(s) would move (%s); nothing written (--check)" % (len(moved), moved_by))
         return 0
 
     temporary = INDEX + ".tmp"
@@ -165,7 +169,7 @@ def main():
         handle.write(updated)
     os.replace(temporary, INDEX)
 
-    print("%d card(s) updated in index.html" % len(moved))
+    print("%d card(s) updated in index.html (%s)" % (len(moved), moved_by))
     return 0
 
 
