@@ -45,21 +45,23 @@ XR_MANUFACTURER = "106440837"
 SHOP_URL = "https://www.imvu.com/shop/web_search.php?manufacturers_id={mid}&page={page}"
 PRODUCT_URL = "https://www.imvu.com/shop/product.php?products_id={pid}"
 
-THUMB_SIZE = (300, 240)
+THUMB_SIZE = (600, 480)
 
-# The originals are 100x80, so every thumbnail is a 3x enlargement and no amount
-# of resampling invents detail. Edge contrast is the one thing that can be put
-# back, and it works better before the resize than after: sharpening at 100x80
-# hands LANCZOS stronger gradients to interpolate, which measured about 45% more
-# detail at tile size than a single post-pass (276 vs 190 variance of the
-# Laplacian) with only faint ringing, where a heavy post-pass leaves halos.
-PRE_SHARPEN = (0.8, 100, 2)
-POST_SHARPEN = (1.2, 80, 2)
+# The originals are 100x80, so every thumbnail is an enlargement and no amount of
+# resampling invents detail. What can go wrong is looking worse than the source:
+# one big jump to 6x with heavy sharpening produced blocky edges and halos (an
+# edge variance of 1433 against 380 for a plain LANCZOS, and it read as crunchy).
+# Two gentler jumps do better — 2x, a light unsharp to give LANCZOS stronger
+# gradients to interpolate, then 3x, a lighter pass — which keeps edges defined
+# without the ringing. The file is 600x480 for a tile that draws at about 300 CSS
+# px, so a high-density screen has real pixels to use instead of stretching a
+# 300px file again.
+ENLARGE_STEPS = ((2, (1.0, 110, 2)), (3, (1.1, 70, 1)))
 THUMB_QUALITY = 86
 
 # Bumped when the pipeline above changes: thumbnails carry it, so an old file is
 # rebuilt even though its source bytes never moved.
-THUMB_STYLE = 2
+THUMB_STYLE = 3
 LOG_PATH = os.path.join(tempfile.gettempdir(), "xr-products.log")
 
 
@@ -164,7 +166,7 @@ def download_image(card, previous):
 
 
 def build_thumbnail(card, previous):
-    """Rebuild the 300x240 WebP from the 100x80 original — but only if it changed.
+    """Rebuild the WebP from the 100x80 original — but only if it changed.
 
     The expensive half of a refresh is the resize and the WebP encode, and
     rewriting eight files every hour churns their timestamps (and any
@@ -195,9 +197,12 @@ def build_thumbnail(card, previous):
         return filename, digest, etag, modified, False
 
     image = Image.open(io.BytesIO(raw)).convert("RGB")
-    image = image.filter(ImageFilter.UnsharpMask(*PRE_SHARPEN))
-    image = image.resize(THUMB_SIZE, Image.LANCZOS)
-    image = image.filter(ImageFilter.UnsharpMask(*POST_SHARPEN))
+    for factor, sharpen in ENLARGE_STEPS:
+        image = image.resize(
+            (image.width * factor, image.height * factor), Image.LANCZOS
+        ).filter(ImageFilter.UnsharpMask(*sharpen))
+    if image.size != THUMB_SIZE:
+        image = image.resize(THUMB_SIZE, Image.LANCZOS)
     image.save(path, "WEBP", quality=THUMB_QUALITY, method=6)
     return filename, digest, etag, modified, True
 
