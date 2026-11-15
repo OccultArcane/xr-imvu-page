@@ -1,0 +1,3 @@
+# One derivable file per line. Leave every line commented out and the strip
+# above the creators stays off the page entirely — it only appears when there
+# is at least one entry below.

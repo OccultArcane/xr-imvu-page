@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>XR — Premium Creator</title>
+<meta name="theme-color" content="#050507" />
+<link rel="icon" href="assets/favicon.png" type="image/png" />
+<meta name="description" content="XR — premium creator. Reality beyond limits." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
+  rel="stylesheet"
+/>
+<link rel="stylesheet" href="styles.css" />
+<meta name="products-version" content="" />
+</head>
+<body>
+
+<div class="page-bg" aria-hidden="true"></div>
+
+<!-- the mark is pinned with the background: it stays put while the page scrolls
+     over it. The sheen layer is clipped to the artwork's own silhouette. -->
+<div class="hero-mark">
+  <img
+    class="hero-mark__img"
+    src="assets/logo.png"
+    alt="XR"
+    width="900"
+    height="617"
+    onerror="this.style.display = 'none'"
+  />
+  <span class="hero-mark__shine" aria-hidden="true"></span>
+</div>
+
+<!-- ============================ TOP BAR ============================ -->
+<header class="topbar">
+  <div class="topbar__inner wrap">
+    <div class="clock-wrap">
+      <time class="clock" id="clock" datetime="">
+        <span class="clock__bracket" aria-hidden="true">[</span><span id="clock-time">--:--:--</span><span class="clock__bracket" aria-hidden="true">]</span>
+      </time>
+      <span class="clock__date" id="clock-date">—</span>
+    </div>
+
+    <!-- nothing is claimed until status.json has been read: painting a default
+         here made the dot flash a confident colour and then grey on every load -->
+    <p class="eyebrow" id="creator-status" data-status="unknown">
+      <span class="eyebrow__dot" aria-hidden="true"></span>
+      <span class="eyebrow__state" id="creator-state">—</span>
+    </p>
+
+    <ul class="socials" aria-label="XR channels">
+      <li>
+        <span class="social is-off" aria-disabled="true" title="Discord">
+          <img src="assets/social/discord.svg" alt="" width="15" height="15" />
+          <span class="sr-only">Discord — coming soon</span>
+        </span>
+      </li>
+      <li>
+        <a class="social" href="https://www.instagram.com/xr.imvu/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" title="Instagram">
+          <img src="assets/social/instagram.svg" alt="" width="15" height="15" />
+        </a>
+      </li>
+      <li>
+        <a class="social" href="https://www.pinterest.com/xrimvu" target="_blank" rel="noopener noreferrer" aria-label="Pinterest" title="Pinterest">
+          <img src="assets/social/pinterest.svg" alt="" width="15" height="15" />
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- pop-down notice: reads assets/notification.txt and types it out -->
+  <div class="notice" id="notice" role="status" aria-live="polite">
+    <div class="notice__inner wrap">
+      <span class="notice__tag"><i class="blink-dot" aria-hidden="true"></i>notice</span>
+      <p class="notice__line">
+        <span class="sr-only" id="notice-text">Discord server and bot under development.</span>
+        <span id="notice-typed" aria-hidden="true"></span><span class="notice__caret" aria-hidden="true">▌</span>
+      </p>
+      <button class="notice__close" type="button" id="notice-close" aria-label="dismiss notification">×</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ====================== NEXT DROP + PRODUCTS ====================== -->
+  <section class="launch wrap" id="launch" aria-label="next drop">
+    <div class="launch__panel">
+
+      <!-- derivable files: hidden outright unless assets/derivables.txt carries
+           at least one entry, so an empty list costs the panel no space -->
+      <div class="derivables" id="derivables" hidden>
+        <span class="derivables__tag"><i class="blink-dot" aria-hidden="true"></i>derivable files</span>
+        <p class="derivables__line">
+          <span class="sr-only" id="derivables-text"></span>
+          <span id="derivables-typed" aria-hidden="true"></span><span class="derivables__caret" aria-hidden="true">▌</span>
+        </p>
+      </div>
+
+      <div class="creators">
+        <p class="creators__label"><span class="accent">Shop</span> these creators</p>
+
+        <ul class="creator-list">
+          <li>
+            <a class="creator" href="https://www.imvu.com/shop/web_search.php?manufacturers_id=272737258" target="_blank" rel="noopener noreferrer">
+              <span class="creator__chip viewfinder">
+                <img
+                  class="creator__avatar"
+                  src="assets/creators/chokinglotus.jpg"
+                  data-live="https://userimages-akm.imvu.com/userdata/72/73/72/58/userpics/Snap_URXd6bghzQ600002773.jpg"
+                  alt=""
+                  width="52"
+                  height="72"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                />
+                <span class="creator__name">
+                  <span class="creator__bracket" aria-hidden="true">[</span>chokinglotus<span class="creator__bracket" aria-hidden="true">]</span>
+                </span>
+              </span>
+            </a>
+          </li>
+
+          <li>
+            <a class="creator" href="https://www.imvu.com/shop/web_search.php?manufacturers_id=179356122" target="_blank" rel="noopener noreferrer">
+              <span class="creator__chip viewfinder">
+                <img
+                  class="creator__avatar"
+                  src="assets/creators/numen.jpg"
+                  data-live="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/179356122_20855017476ad93b5528ced.gif"
+                  alt=""
+                  width="52"
+                  height="72"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                />
+                <span class="creator__name">
+                  <span class="creator__bracket" aria-hidden="true">[</span>Numen<span class="creator__bracket" aria-hidden="true">]</span>
+                </span>
+              </span>
+            </a>
+          </li>
+
+          <li>
+            <a class="creator" href="https://www.imvu.com/shop/web_search.php?manufacturers_id=119374898" target="_blank" rel="noopener noreferrer">
+              <span class="creator__chip viewfinder">
+                <img
+                  class="creator__avatar"
+                  src="assets/creators/g59.jpg"
+                  data-live="https://userimages-akm.imvu.com/catalog/includes/modules/phpbb2/images/avatars/119374898_20348436876a9f21e11da5a.gif"
+                  alt=""
+                  width="52"
+                  height="72"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                />
+                <span class="creator__name">
+                  <span class="creator__bracket" aria-hidden="true">[</span>G59<span class="creator__bracket" aria-hidden="true">]</span>
+                </span>
+              </span>
+            </a>
+          </li>
+
+          <li>
+            <a class="creator" href="https://www.imvu.com/shop/web_search.php?manufacturers_id=345204947" target="_blank" rel="noopener noreferrer">
+              <span class="creator__chip viewfinder">
+                <img
+                  class="creator__avatar"
+                  src="assets/creators/scissors.jpg"
+                  data-live="https://userimages01-akm.imvu.com/userdata/45/20/49/47/userpics/Snap_IvOqnYTnrE2021497658.jpg"
+                  alt=""
+                  width="52"
+                  height="72"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                />
+                <span class="creator__name">
+                  <span class="creator__bracket" aria-hidden="true">[</span>scissors<span class="creator__bracket" aria-hidden="true">]</span>
+                </span>
+              </span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <div class="timer" id="timer">
+        <p class="timer__head">
+          <span class="timer__tag" id="drop-state">Next drop</span>
+          <span class="timer__date" id="drop-date">—</span>
+        </p>
+
+        <div class="timer__unit">
+          <span class="timer__value" data-unit="days">00</span>
+          <span class="timer__label">Days</span>
+        </div>
+        <div class="timer__unit">
+          <span class="timer__value" data-unit="hours">00</span>
+          <span class="timer__label">Hours</span>
+        </div>
+        <div class="timer__unit">
+          <span class="timer__value" data-unit="minutes">00</span>
+          <span class="timer__label">Minutes</span>
+        </div>
+        <div class="timer__unit">
+          <span class="timer__value" data-unit="seconds">00</span>
+          <span class="timer__label">Seconds</span>
+        </div>
+      </div>
+
+      <section class="releases" aria-labelledby="releases-title">
+      <h2 class="releases__head" id="releases-title">
+        <i class="blink-dot" aria-hidden="true"></i>
+        <span class="releases__title">new Releases</span>
+        <span class="releases__feed" id="releases-feed" aria-hidden="true">semi live feed</span>
+      </h2>
+
+      <ul class="grid" id="releases">
+        </ul>
+      </section>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="foot__left">
+      <p class="foot__dmca">All theft will result in DMCA consequences</p>
+      <p class="foot__copy">© 2026 All rights reserved</p>
+    </div>
+    <p class="foot__note">The Art of Immersion</p>
+  </footer>
+
+</main>
+
+<script>
+  (function () {
+    var pad = function (n) { return String(Math.max(0, n)).padStart(2, "0"); };
+
+    /* ---------- weekly drop countdown ----------
+       Target is derived from the clock, so it rolls over on its own to the
+       next Friday the moment a drop opens. */
+    var DROP_WEEKDAY = 5; // Friday
+    var DROP_HOUR = 0;    // local midnight
+
+    function nextDrop(now) {
+      var date = new Date(now);
+      date.setHours(DROP_HOUR, 0, 0, 0);
+      date.setDate(date.getDate() + ((DROP_WEEKDAY - date.getDay() + 7) % 7));
+      if (date.getTime() <= now) date.setDate(date.getDate() + 7);
+      return date.getTime();
+    }
+
+    var units = {};
+    document.querySelectorAll("[data-unit]").forEach(function (el) {
+      units[el.dataset.unit] = el;
+    });
+
+    var stateEl = document.getElementById("drop-state");
+    var dateEl = document.getElementById("drop-date");
+
+    function tick() {
+      var now = Date.now();
+      var target = nextDrop(now);
+      var seconds = Math.floor(Math.max(0, target - now) / 1000);
+
+      units.days.textContent = pad(Math.floor(seconds / 86400));
+      units.hours.textContent = pad(Math.floor((seconds % 86400) / 3600));
+      units.minutes.textContent = pad(Math.floor((seconds % 3600) / 60));
+      units.seconds.textContent = pad(seconds % 60);
+
+      var drop = new Date(target);
+      dateEl.textContent =
+        drop.getFullYear() + "-" + pad(drop.getMonth() + 1) + "-" + pad(drop.getDate());
+      stateEl.textContent = new Date(now).getDay() === DROP_WEEKDAY ? "Drop day" : "Next drop";
+    }
+
+    tick();
+    setInterval(tick, 250);
+
+    /* ---------- top-bar clock and date ---------- */
+    var clockEl = document.getElementById("clock");
+    var clockTime = document.getElementById("clock-time");
+    var clockDate = document.getElementById("clock-date");
+
+    function stamp() {
+      var now = new Date();
+      clockTime.textContent =
+        pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+      clockDate.textContent = now
+        .toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" })
+        .toUpperCase();
+      clockEl.dateTime = now.toISOString();
+    }
+
+    stamp();
+    setInterval(stamp, 1000);
+
+    /* ---------- the notice: type, hold, delete, retype ----------
+       Same behaviour as the storefront's header notice, driven from a plain
+       text file so the message can change without touching this script. */
+    var noticeEl = document.getElementById("notice");
+    var typeEl = document.getElementById("notice-typed");
+    var srEl = document.getElementById("notice-text");
+    var closeEl = document.getElementById("notice-close");
+    var FALLBACK = "Discord server and bot under development.";
+    var TYPE_MS = 55;
+    var HOLD_TICKS = Math.round(30000 / TYPE_MS);
+    var EMPTY_TICKS = 8;
+    var noticeText = FALLBACK;
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    function runNotice() {
+      var len = 0;
+      var phase = "typing";
+      var wait = 0;
+
+      if (reduceMotion) {
+        typeEl.textContent = noticeText;
+        return;
+      }
+
+      setInterval(function () {
+        if (phase === "typing") {
+          len += 1;
+          typeEl.textContent = noticeText.slice(0, len);
+          if (len >= noticeText.length) {
+            phase = "holding";
+            wait = HOLD_TICKS;
+          }
+        } else if (phase === "holding") {
+          wait -= 1;
+          if (wait <= 0) phase = "erasing";
+        } else if (phase === "erasing") {
+          len = Math.max(0, len - 2);
+          typeEl.textContent = noticeText.slice(0, len);
+          if (len <= 0) {
+            phase = "waiting";
+            wait = EMPTY_TICKS;
+          }
+        } else {
+          wait -= 1;
+          if (wait <= 0) phase = "typing";
+        }
+      }, TYPE_MS);
+    }
+
+    fetch("assets/notification.txt", { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.text() : ""; })
+      .then(function (raw) {
+        var doc = (raw || "").trim();
+        if (doc) {
+          noticeText = doc;
+          srEl.textContent = doc;
+        }
+        runNotice();
+      })
+      .catch(function () { runNotice(); });
+
+    closeEl.addEventListener("click", function () {
+      noticeEl.hidden = true;
+    });
+
+    /* ---------- derivable files ----------
+       The notice's strip, living inside the panel instead of the header.
+       assets/derivables.txt holds one file per line; blank lines and lines
+       starting with # are skipped, which is what keeps the strip off the page
+       when nothing has been entered yet. With entries it types through them
+       one at a time, the same way the notice types its line. */
+    var derivEl = document.getElementById("derivables");
+    var derivType = document.getElementById("derivables-typed");
+    var derivSr = document.getElementById("derivables-text");
+    var derivPanel = document.querySelector(".launch__panel");
+    var DERIV_HOLD_TICKS = Math.round(9000 / TYPE_MS);
+
+    function runDerivables(entries) {
+      if (reduceMotion) {
+        derivType.textContent = entries.join("  ·  ");
+        return;
+      }
+
+      var index = 0;
+      var text = entries[0];
+      var len = 0;
+      var phase = "typing";
+      var wait = 0;
+
+      window.setInterval(function () {
+        if (phase === "typing") {
+          len += 1;
+          derivType.textContent = text.slice(0, len);
+          if (len >= text.length) {
+            phase = "holding";
+            wait = DERIV_HOLD_TICKS;
+          }
+        } else if (phase === "holding") {
+          wait -= 1;
+          if (wait <= 0) phase = "erasing";
+        } else if (phase === "erasing") {
+          len = Math.max(0, len - 2);
+          derivType.textContent = text.slice(0, len);
+          if (len <= 0) {
+            phase = "waiting";
+            wait = EMPTY_TICKS;
+          }
+        } else {
+          wait -= 1;
+          if (wait <= 0) {
+            index = (index + 1) % entries.length;
+            text = entries[index];
+            phase = "typing";
+          }
+        }
+      }, TYPE_MS);
+    }
+
+    if (derivEl) {
+      fetch("assets/derivables.txt", { cache: "no-store" })
+        .then(function (res) { return res.ok ? res.text() : ""; })
+        .then(function (raw) {
+          var entries = String(raw || "")
+            .split(/\r?\n/)
+            .map(function (line) { return line.trim(); })
+            .filter(function (line) { return line && line.charAt(0) !== "#"; });
+
+          /* nothing entered: no strip, no row, no gap */
+          if (!entries.length) return;
+
+          derivSr.textContent = entries.join(" · ");
+          derivEl.hidden = false;
+          if (derivPanel) derivPanel.classList.add("launch__panel--files");
+          runDerivables(entries);
+        })
+        .catch(function () { /* no file, no strip */ });
+    }
+
+    /* ---------- releases: read the shop snapshot, then loop the row ----------
+       assets/products.json is the list the page renders from, newest first, so
+       adding a product is a JSON edit rather than a markup edit. The row shows
+       four cards at every width; past four it clones the set once and rewrites
+       the scroll position at the seam, so it loops with no visible jump. */
+    var RELEASES_URL = "assets/products.json";
+    var carouselEl = document.getElementById("releases");
+
+    if (carouselEl) {
+      /* the frame holds four cards on desktop and two on a phone; the number
+         lives in CSS (--per-view) so the layout and this check cannot drift */
+      var perView = function () {
+        var value = parseInt(getComputedStyle(carouselEl).getPropertyValue("--per-view"), 10);
+        return value > 0 ? value : 4;
+      };
+      var seam = 0;
+
+      var countOriginals = function () {
+        var kids = carouselEl.children;
+        var n = 0;
+        while (n < kids.length && !kids[n].hasAttribute("aria-hidden")) n += 1;
+        return n;
+      };
+
+      var measureSeam = function () {
+        var kids = carouselEl.children;
+        var originals = countOriginals();
+        seam = originals && kids[originals] ? kids[originals].offsetLeft - kids[0].offsetLeft : 0;
+      };
+
+      var cloneRelease = function () {
+        var kids = Array.prototype.slice.call(carouselEl.children);
+        if (kids.length > perView() && !carouselEl.querySelector('[aria-hidden="true"]')) {
+          kids.forEach(function (card) {
+            var clone = card.cloneNode(true);
+            /* the copies are decoration: out of the accessibility tree and
+               out of the tab order, so the row stays eight links, not sixteen */
+            clone.setAttribute("aria-hidden", "true");
+            Array.prototype.forEach.call(clone.querySelectorAll("a"), function (link) {
+              link.tabIndex = -1;
+            });
+            carouselEl.appendChild(clone);
+          });
+        }
+        measureSeam();
+      };
+
+      /* once the first copy owns the frame the same four cards are showing a
+         set back, so the position is dropped by exactly one set */
+      var rewrite = function () {
+        if (!seam || carouselEl.scrollLeft < seam - 1) return;
+        carouselEl.scrollLeft -= seam;
+      };
+
+      var ticking = false;
+      carouselEl.addEventListener(
+        "scroll",
+        function () {
+          if (ticking) return;
+          ticking = true;
+          window.requestAnimationFrame(function () {
+            ticking = false;
+            rewrite();
+          });
+        },
+        { passive: true }
+      );
+
+      window.addEventListener("resize", measureSeam);
+
+      var buildTile = function (item) {
+        var li = document.createElement("li");
+        li.className = "tile-item";
+
+        var link = document.createElement("a");
+        link.className = "tile";
+        link.href = item.url || "https://www.imvu.com/shop/";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+
+        var thumb = document.createElement("img");
+        thumb.className = "tile__img";
+        thumb.src = item.src || item.image || "";
+        thumb.alt = item.name || "";
+        thumb.loading = "lazy";
+
+        var info = document.createElement("span");
+        info.className = "tile__info";
+
+        var name = document.createElement("span");
+        name.className = "tile__name";
+        name.textContent = item.name || "";
+
+        var price = document.createElement("span");
+        price.className = "tile__price";
+        price.textContent = item.price ? item.price + " credits" : "";
+
+        info.appendChild(name);
+        info.appendChild(price);
+        link.appendChild(thumb);
+        link.appendChild(info);
+        li.appendChild(link);
+        return li;
+      };
+
+      /* ---------- the drift ----------
+         The row steps one card every few seconds and runs through the seam,
+         which is what makes it read as a carousel rather than a scroll area.
+         It stands still while the pointer or the keyboard is on it, and never
+         runs at all under reduced-motion. */
+      var DRIFT_MS = 3600;
+      var driftTimer = null;
+      var calm = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      var stepWidth = function () {
+        var kids = carouselEl.children;
+        return kids.length > 1 ? kids[1].offsetLeft - kids[0].offsetLeft : 0;
+      };
+
+      var advance = function () {
+        var step = stepWidth();
+        if (!step) return;
+        var target = Math.round(carouselEl.scrollLeft / step) * step + step;
+        carouselEl.scrollTo({ left: target, behavior: "smooth" });
+      };
+
+      var stopDrift = function () {
+        if (driftTimer) {
+          window.clearInterval(driftTimer);
+          driftTimer = null;
+        }
+      };
+
+      var startDrift = function () {
+        stopDrift();
+        if (calm.matches || !seam) return;
+        driftTimer = window.setInterval(advance, DRIFT_MS);
+      };
+
+      carouselEl.addEventListener("pointerenter", stopDrift);
+      carouselEl.addEventListener("pointerleave", startDrift);
+      carouselEl.addEventListener("focusin", stopDrift);
+      carouselEl.addEventListener("focusout", startDrift);
+      if (calm.addEventListener) calm.addEventListener("change", startDrift);
+
+      var renderReleases = function (items) {
+        carouselEl.scrollLeft = 0;
+        carouselEl.innerHTML = "";
+        items.forEach(function (item) {
+          carouselEl.appendChild(buildTile(item));
+        });
+        cloneRelease();
+        startDrift();
+      };
+
+      /* The snapshot is re-read every minute while the page is open, and the row
+         only rebuilds when the list actually changed — so a scheduled refresh
+         shows up on its own, without a reload. */
+      var loaded = "";
+
+      /* tools/serve.py stamps this page with products.json's modification time,
+         so the same URL is asked for until the scraper rewrites the list: the
+         browser revalidates it and gets a 304 rather than a fresh download every
+         minute. Opened without that server, the clock stands in. */
+      var productsVersion = (function () {
+        var meta = document.querySelector('meta[name="products-version"]');
+        return meta && meta.content ? meta.content : Date.now();
+      })();
+
+      var loadReleases = function () {
+        return fetch(RELEASES_URL + "?v=" + productsVersion, { cache: "no-cache" })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (items) {
+            if (!Array.isArray(items) || !items.length) return;
+            var signature = items
+              .map(function (item) { return item.id + ":" + item.price + ":" + item.src; })
+              .join("|");
+            if (signature === loaded) return;
+            loaded = signature;
+            renderReleases(items);
+          });
+      };
+
+      loadReleases().catch(function () { /* an empty row beats a broken one */ });
+
+      window.setInterval(function () {
+        if (document.hidden) return;
+        loadReleases().catch(function () {});
+      }, 60000);
+    }
+
+    /* ---------- the creator row: the releases' loop, held in reserve ----------
+       While the chips fit the band nothing here changes — they stay centred.
+       The moment more creators arrive than the row can hold, the set is cloned
+       once and the scroll is dropped by exactly one set at the seam, so the row
+       loops the way the products do. Chips carry their own widths, so the step
+       is measured to the next chip instead of divided evenly. */
+    var creatorList = document.querySelector(".creator-list");
+
+    if (creatorList) {
+      var CREATOR_DRIFT_MS = 3600;
+      var cSeam = 0;
+      var cTimer = null;
+      var cCalm = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      var originalsOf = function (list) {
+        var kids = list.children;
+        var n = 0;
+        while (n < kids.length && !kids[n].hasAttribute("aria-hidden")) n += 1;
+        return n;
+      };
+
+      var dropClones = function () {
+        Array.prototype.slice.call(creatorList.querySelectorAll("[data-clone]")).forEach(function (node) {
+          node.remove();
+        });
+      };
+
+      /* where the first copy starts, in track coordinates */
+      var cMeasure = function () {
+        var kids = creatorList.children;
+        var n = originalsOf(creatorList);
+        cSeam = n && kids[n] ? kids[n].offsetLeft - kids[0].offsetLeft : 0;
+      };
+
+      /* the next chip that begins past where the row is now */
+      var cStep = function () {
+        var kids = creatorList.children;
+        if (!kids.length) return 0;
+        var base = kids[0].offsetLeft;
+        for (var i = 1; i < kids.length; i += 1) {
+          var at = kids[i].offsetLeft - base;
+          if (at > creatorList.scrollLeft + 1) return at;
+        }
+        return cSeam;
+      };
+
+      var cAdvance = function () {
+        if (!cSeam) return;
+        creatorList.scrollTo({ left: cStep(), behavior: "smooth" });
+      };
+
+      var cStop = function () {
+        if (cTimer) {
+          window.clearInterval(cTimer);
+          cTimer = null;
+        }
+      };
+
+      var cStart = function () {
+        cStop();
+        if (cCalm.matches || !cSeam) return;
+        cTimer = window.setInterval(cAdvance, CREATOR_DRIFT_MS);
+      };
+
+      var cRewrite = function () {
+        if (!cSeam || creatorList.scrollLeft < cSeam - 1) return;
+        creatorList.scrollLeft -= cSeam;
+      };
+
+      var syncCreators = function () {
+        dropClones();
+        creatorList.scrollLeft = 0;
+        /* the row is measured against the band's whole width, so any width left
+           over from a previous pass has to come off before measuring */
+        creatorList.style.width = "";
+        creatorList.style.removeProperty("--chip-w");
+
+        var kids = Array.prototype.slice.call(creatorList.children);
+        var n = originalsOf(creatorList);
+        if (!n) return;
+
+        /* summed, not spanned: while the row is still wrapping the last chip
+           sits on a second line and its offset would under-report the width */
+        var gap = parseFloat(getComputedStyle(creatorList).columnGap) || 0;
+        var room = creatorList.clientWidth;
+        var setWidth = 0;
+        var widest = 0;
+        kids.forEach(function (chip) {
+          setWidth += chip.offsetWidth;
+          widest = Math.max(widest, chip.offsetWidth);
+        });
+        setWidth += gap * (n - 1);
+        var overflows = setWidth > room + 1;
+
+        creatorList.classList.toggle("creator-list--loop", overflows);
+
+        if (overflows) {
+          /* level every card to the widest, then width the row to the whole
+             cards that fit: the window is the same width at every step, so its
+             edges always land on card edges and nothing is ever half shown */
+          var per = Math.floor((room + gap) / (widest + gap));
+          if (per < 1) per = 1;
+          /* the cards are stretched to fill the band exactly, so the row has no
+             slack at its edges and its width is always a whole number of them */
+          var cardW = (room - (per - 1) * gap) / per;
+          creatorList.style.setProperty("--chip-w", cardW + "px");
+          creatorList.style.width = room + "px";
+
+          kids.forEach(function (chip) {
+            var clone = chip.cloneNode(true);
+            /* decoration, like the product copies: out of the accessibility
+               tree and out of the tab order */
+            clone.setAttribute("aria-hidden", "true");
+            clone.setAttribute("data-clone", "");
+            Array.prototype.forEach.call(clone.querySelectorAll("a"), function (link) {
+              link.tabIndex = -1;
+            });
+            creatorList.appendChild(clone);
+          });
+        }
+
+        cMeasure();
+        cStart();
+      };
+
+      var cTicking = false;
+      creatorList.addEventListener(
+        "scroll",
+        function () {
+          if (cTicking) return;
+          cTicking = true;
+          window.requestAnimationFrame(function () {
+            cTicking = false;
+            cRewrite();
+          });
+        },
+        { passive: true }
+      );
+
+      creatorList.addEventListener("pointerenter", cStop);
+      creatorList.addEventListener("pointerleave", cStart);
+      creatorList.addEventListener("focusin", cStop);
+      creatorList.addEventListener("focusout", cStart);
+      if (cCalm.addEventListener) cCalm.addEventListener("change", cStart);
+
+      /* new chips, a resize or a font landing all change the width, so the row
+         re-measures rather than assuming it still fits */
+      var cResize = null;
+      window.addEventListener("resize", function () {
+        window.clearTimeout(cResize);
+        cResize = window.setTimeout(syncCreators, 150);
+      });
+
+      syncCreators();
+    }
+
+    /* ---------- creator avatars: swap to the live picture once decoded ---------- */
+    document.querySelectorAll(".creator__avatar").forEach(function (img) {
+      var live = img.dataset.live;
+      if (!live) return;
+      var probe = new Image();
+      probe.referrerPolicy = "no-referrer";
+      probe.onload = function () { img.src = live; };
+      probe.src = live;
+    });
+
+    /* ---------- the creator's own status ----------
+       The dot and its word come from assets/status.json, which
+       tools/track-status.py rewrites from IMVU's own presence. "Do Not Disturb"
+       counts as offline; everything else — Online, Away, whatever IMVU publishes
+       next — is shown as creating, because being at the desk is what creating
+       means on this page. Those two are the only looks it has. */
+    var eyebrow = document.getElementById("creator-status");
+    var statusEl = document.getElementById("creator-state");
+
+    /* the watcher polls every 30s, so three minutes without a stamp means the
+       reading has stopped being refreshed: a dead task must not look confident */
+    var STALE_AFTER = 180;
+
+    /* every blinking dot shares one beat. A CSS animation starts whenever its
+       own element did, and the plate only starts once the status reads creating,
+       so it would drift against the markers; restarting them together after each
+       read puts them back in step */
+    function syncBlinks() {
+      var dots = document.querySelectorAll(".blink-dot, .eyebrow__dot");
+      var i;
+      for (i = 0; i < dots.length; i++) dots[i].style.animation = "none";
+      void document.body.offsetWidth;   /* one reflow, so the reset lands */
+      for (i = 0; i < dots.length; i++) dots[i].style.removeProperty("animation");
+    }
+
+    function applyStatus(value, manual, stamp) {
+      /* two looks, and only two: the watcher writes "Offline" or "Online", and
+         a label beginning "off" wears the grey; anything else is creating,
+         because being at the desk is the creating state here */
+      var raw = String(value == null ? "" : value).toLowerCase();
+      var status = raw.indexOf("off") === 0 ? "offline" : "creating";
+      var at = stamp ? Date.parse(stamp) : NaN;
+      var age = isFinite(at) ? (Date.now() - at) / 1000 : Infinity;
+      var stale = !(age <= STALE_AFTER);
+      if (!value || stale) status = "unknown";
+      var since = isFinite(at) ? new Date(at).toLocaleTimeString() : "";
+      if (eyebrow) {
+        eyebrow.dataset.status = status;
+        /* a hand-set label is not a reading: the dot goes hollow and says why */
+        eyebrow.dataset.manual = manual ? "true" : "false";
+        eyebrow.setAttribute(
+          "aria-label",
+          stale
+            ? "Creator status: no recent reading" + (since ? ", the last was at " + since : "")
+            : "Creator status: " + status +
+                (manual ? ", set by hand rather than read from IMVU" : "")
+        );
+        if (stale)
+          eyebrow.title = since
+            ? "No reading since " + since + " — the watcher may have stopped"
+            : "No reading yet — waiting for the watcher";
+        else if (manual) eyebrow.title = "Set by hand — not read from IMVU";
+        else eyebrow.removeAttribute("title");
+      }
+      if (statusEl) statusEl.textContent = stale ? "stale" : status;
+      syncBlinks();
+    }
+
+    /* re-read twice a minute — faster than the releases row, because the label
+       is written by a watcher: the dot changes without a reload */
+    function readStatus() {
+      fetch("assets/status.json", { cache: "no-store" })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .then(function (data) {
+          if (data && data.status)
+            applyStatus(data.status, !!data.manual, data.updated_at);
+        })
+        .catch(function () { /* keep the last word */ });
+    }
+
+    readStatus();
+    window.setInterval(readStatus, 30000);
+
+  })();
+</script>
+
+<script>
+  /* The preview server cannot warn anyone that it is down, so this page leaves a
+     copy of offline.html behind: when a navigation fails to reach the network,
+     the service worker answers with that instead of the browser's error page. */
+  if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function () { /* the page works without it */ });
+    });
+  }
+</script>
+</body>
+</html>

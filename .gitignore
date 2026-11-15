@@ -1,0 +1,15 @@
+# a signed-in IMVU visitor's cookie header — a credential, never committed
+# the session cookie now lives outside the project; this covers a stray copy
+*.cookies
+
+# a hand-set status label and other local scratch
+assets/status.override.txt
+
+__pycache__/
+*.pyc
+
+# capture screenshots kept at the project root, not part of the site
+/*.png
+
+# Freebuff project marker
+.freebuff/
