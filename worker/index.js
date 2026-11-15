@@ -149,9 +149,13 @@ function settle(previous, online, nowSeconds) {
   return { label, streak, offlineSince, changed };
 }
 
-// the settling rule is exported so it can be tested without IMVU or a deployment
-// (worker/settle.test.mjs); nothing else imports it
-export { settle, ONLINE_CONFIRM, ONLINE_GRACE };
+// The settling rule is exported so it can be tested without IMVU or a deployment
+// (worker/settle.test.mjs, tools/test_settle_parity.py); nothing else imports it.
+// Only functions may be exported here: workerd treats every named export of the
+// entry module as a handler and refuses to start if one is not "function or
+// ExportedHandler" — exporting the two thresholds stopped the Worker booting
+// entirely, which the unit tests could not see.
+export { settle };
 
 export default {
   async fetch(request, env) {

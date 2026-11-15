@@ -78,7 +78,7 @@ def worker_labels(flags):
     if completed.returncode != 0:
         raise AssertionError("the Worker side would not run:\n" + completed.stderr)
     result = json.loads(completed.stdout)
-    return result["results"][0]["labels"], result
+    return result["results"][0]["labels"]
 
 
 class ParityTest(unittest.TestCase):
@@ -88,52 +88,51 @@ class ParityTest(unittest.TestCase):
 
     def labels(self, flags):
         sample_steps = steps(flags)
-        worker, meta = worker_labels(flags)
-        return watcher_labels(self.track, sample_steps), worker, meta
+        return watcher_labels(self.track, sample_steps), worker_labels(flags)
 
     def test_the_thresholds_are_the_same_numbers(self):
-        _, _, meta = self.labels([True])
-        self.assertEqual(self.track.ONLINE_CONFIRM, meta["ONLINE_CONFIRM"])
-        self.assertEqual(self.track.ONLINE_GRACE, meta["ONLINE_GRACE"])
+        # the Worker's two thresholds cannot be imported — a Worker entry module may
+        # only export functions, or workerd will not start it — so they are pinned
+        # here by the sequences below, and by worker/settle.test.mjs's edges.
         self.assertEqual(self.track.ONLINE_CONFIRM, 2)
         self.assertEqual(self.track.ONLINE_GRACE, 360)
 
     def test_a_steady_online_session(self):
-        watcher, worker, _ = self.labels([True] * 5)
+        watcher, worker = self.labels([True] * 5)
         self.assertEqual(watcher, [F, O, O, O, O])
         self.assertEqual(worker, [F, O, O, O, O])
 
     def test_a_steady_offline_run(self):
-        watcher, worker, _ = self.labels([False] * 4)
+        watcher, worker = self.labels([False] * 4)
         self.assertEqual(watcher, [F, F, F, F])
         self.assertEqual(worker, [F, F, F, F])
 
     def test_recovery_after_a_settled_offline_run(self):
-        watcher, worker, _ = self.labels([False, False, True, True])
+        watcher, worker = self.labels([False, False, True, True])
         self.assertEqual(watcher, [F, F, F, O])
         self.assertEqual(worker, [F, F, F, O])
 
     def test_the_grace_window_holds_a_settled_online_label(self):
         # two trues settle Online at +30; the offline samples from +60 must hold
         # it for the whole window rather than flash
-        watcher, worker, _ = self.labels([True] * 2 + [False] * 15)
+        watcher, worker = self.labels([True] * 2 + [False] * 15)
         self.assertEqual(watcher.count(O), 12, "the watcher held Online through the window")
         self.assertEqual(worker.count(O), 13, "the Worker held Online through the window")
         self.assertEqual(watcher[-1], F)
         self.assertEqual(worker[-1], F)
 
     def test_an_isolated_true_is_not_a_session(self):
-        watcher, worker, _ = self.labels([True, False, True, True])
+        watcher, worker = self.labels([True, False, True, True])
         self.assertEqual(watcher, [F, O, F, O], "one true is confirmed by the next two")
         self.assertEqual(worker, [F, F, F, O])
 
     def test_flapping_never_settles(self):
-        watcher, worker, _ = self.labels([True, False] * 6)
+        watcher, worker = self.labels([True, False] * 6)
         self.assertEqual(worker, [F] * 12, "the Worker holds one label throughout")
         self.assertEqual(watcher, [F, O] * 6, "the watcher follows every sample")
 
     def test_a_gap_inside_a_session(self):
-        watcher, worker, _ = self.labels([True] * 4 + [False] + [True] * 2)
+        watcher, worker = self.labels([True] * 4 + [False] + [True] * 2)
         self.assertEqual(watcher, [F, O, O, O, O, F, O])
         self.assertEqual(worker, [F, O, O, O, O, O, O])
 
@@ -145,7 +144,7 @@ class ParityTest(unittest.TestCase):
         is recorded rather than discovered later on the live page.
         """
         settled = [True] * 2 + [False] * 15
-        watcher, worker, _ = self.labels(settled)
+        watcher, worker = self.labels(settled)
         differing = [i for i, (a, b) in enumerate(zip(watcher, worker)) if a != b]
         self.assertEqual(differing, [13], "grace anchored at the last true (watcher) vs first false (Worker)")
         self.assertEqual(watcher[13], F, "watcher gives up at +390s, six minutes after the last true")
@@ -153,7 +152,7 @@ class ParityTest(unittest.TestCase):
         self.assertEqual(watcher[14], worker[14], "they agree from +420s on")
 
         stray = [True, False, True, True]
-        watcher, worker, _ = self.labels(stray)
+        watcher, worker = self.labels(stray)
         differing = [i for i, (a, b) in enumerate(zip(watcher, worker)) if a != b]
         self.assertEqual(differing, [1], "an unconfirmed true flips the watcher, not the Worker")
 

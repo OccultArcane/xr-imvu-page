@@ -13,3 +13,5 @@ __pycache__/
 
 # Freebuff project marker
 .freebuff/
+worker/.wrangler/
+wrangler-dev.log

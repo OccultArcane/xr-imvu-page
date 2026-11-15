@@ -1,0 +1,26 @@
+/**
+ * Local-only config for exercising worker/index.js against a real SQLite D1.
+ *
+ * Not the deployment (worker/deploy.json is), and not a binding the published
+ * endpoint uses — it exists so `wrangler dev` can hand the Worker a genuine D1
+ * implementation, which is what runs the CREATE TABLE and the ON CONFLICT upsert
+ * through SQLite instead of a fake that accepts any statement.
+ *
+ *   npx wrangler dev --config worker/wrangler.test.jsonc --port 8799
+ *   npx wrangler d1 execute xr-status-test --local --config worker/wrangler.test.jsonc --command "..."
+ *
+ * The database_id is a placeholder: local D1 keys off database_name in
+ * worker/.wrangler/state, and nothing here ever touches a remote database.
+ */
+{
+  "name": "xr-status-d1-test",
+  "main": "index.js",
+  "compatibility_date": "2026-11-15",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "xr-status-test",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ]
+}

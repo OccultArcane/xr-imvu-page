@@ -4,10 +4,10 @@
  * settle_label(). Not deployed (deploy.json names only index.js).
  *
  *   stdin:  {"scenarios": [{"seed": <row|null>, "steps": [{"online": bool, "at": seconds}]}]}
- *   stdout: {"results": [{"labels": [...]}], "ONLINE_CONFIRM": n, "ONLINE_GRACE": n}
+ *   stdout: {"results": [{"labels": [...]}]}
  */
 
-import { settle, ONLINE_CONFIRM, ONLINE_GRACE } from "./index.js";
+import { settle } from "./index.js";
 
 const chunks = [];
 for await (const chunk of process.stdin) chunks.push(chunk);
@@ -25,4 +25,4 @@ const results = (input.scenarios || []).map((scenario) => {
   return { labels };
 });
 
-process.stdout.write(JSON.stringify({ results, ONLINE_CONFIRM, ONLINE_GRACE }));
+process.stdout.write(JSON.stringify({ results }));

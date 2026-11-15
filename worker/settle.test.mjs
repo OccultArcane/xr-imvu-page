@@ -15,7 +15,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { settle, ONLINE_CONFIRM, ONLINE_GRACE } from "./index.js";
+import { settle } from "./index.js";
+
+// The published thresholds, written out rather than imported: a Worker's entry
+// module may only export functions, or workerd refuses to start it (worker/index.js
+// notes the failure this caused). The boundary tests below are what pin the
+// numbers — 359s holds, 360s flips, one true is not enough.
+const ONLINE_CONFIRM = 2;
+const ONLINE_GRACE = 360;
 
 const T0 = 1_700_000_000;
 
@@ -27,11 +34,6 @@ function row(label, streak = 0, offlineSince = null) {
 function store(result) {
   return { label: result.label, streak: result.streak, offline_since: result.offlineSince };
 }
-
-test("the constants are the ones the watcher uses", () => {
-  assert.equal(ONLINE_CONFIRM, 2, "two agreeing samples before claiming online");
-  assert.equal(ONLINE_GRACE, 360, "six minutes of offline before believing it");
-});
 
 test("a cold start takes the first reading as the label", () => {
   assert.equal(settle(null, true, T0).label, "Online");
