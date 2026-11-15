@@ -376,11 +376,12 @@ ul { list-style: none; }
   align-items: center;
   gap: 7px;
   margin: 0;
-  /* the status word wears the notice tag's type: same monospace face, same size
-     and tracking, so the two dot-and-label tags in the chrome read as one set.
-     Only the colour is the plate's own, because it carries the state */
+  /* the status word is a title, not a footnote: the notice tag's monospace face
+     and tracking, but sized with the section heads (`.releases__head` and
+     `.timer__head`) so it sits at their height. The colour stays its own,
+     because it carries the state */
   font-family: var(--font-mono);
-  font-size: clamp(8.5px, 0.85vw, 10.5px);
+  font-size: clamp(9.5px, 1.05vw, 12px);
   font-weight: 400;
   letter-spacing: 0.26em;
   text-transform: uppercase;
@@ -396,8 +397,9 @@ ul { list-style: none; }
    dim default is the state before the file has answered and after its stamp
    goes stale: a still, unlit dot that claims nothing */
 .eyebrow__dot {
-  width: 6px;
-  height: 6px;
+  /* one step up with the word: a 6px dot under 12px type read undersized */
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   /* one shape for every state: a 1px ring of the state's colour with the middle
      left dark. The colour comes from --dot, which each state sets; the ring
