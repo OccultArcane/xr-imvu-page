@@ -1,0 +1,9 @@
+{
+  "name": "xr-status-endpoint",
+  "private": true,
+  "type": "module",
+  "description": "Presence endpoint the published page reads its status from. Deployed from deploy.json; this file only tells Node the sources are ES modules so worker/settle.test.mjs can import them.",
+  "scripts": {
+    "test": "node --test ."
+  }
+}

@@ -149,6 +149,10 @@ function settle(previous, online, nowSeconds) {
   return { label, streak, offlineSince, changed };
 }
 
+// the settling rule is exported so it can be tested without IMVU or a deployment
+// (worker/settle.test.mjs); nothing else imports it
+export { settle, ONLINE_CONFIRM, ONLINE_GRACE };
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
