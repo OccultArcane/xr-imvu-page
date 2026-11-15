@@ -63,7 +63,7 @@
   --veil: 0.9;
   /* the gap between the panel and the chrome above and below it — the same
      distance under the bar as above the footer */
-  --band-gap: clamp(12px, 1.8vh, 22px);
+  --band-gap: clamp(8px, 1.2vh, 16px);
   --radius: 12px;
 
   --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -495,7 +495,7 @@ ul { list-style: none; }
 /* the creator row is the panel's first surface, above the drop head */
 .creators {
   grid-area: creators;
-  padding: clamp(9px, 1.3vh + 0.2vw, 18px);
+  padding: clamp(7px, 1vh + 0.15vw, 14px) clamp(9px, 1.3vh + 0.2vw, 18px);
   border: 1px solid var(--line);
   /* the drop band's plate, carried up here: the row is dark enough now that
      the chips inside it no longer need a backdrop of their own */
@@ -637,8 +637,10 @@ ul { list-style: none; }
     "creators"
     "timer"
     "releases";
-  gap: clamp(8px, 1.2vh + 0.2vw, 16px);
-  padding: clamp(9px, 1.3vh + 0.2vw, 18px);
+  gap: clamp(6px, 0.85vh + 0.15vw, 12px);
+  /* vertical tightened with the rest of the page; the horizontal keeps the
+     gutter the bands inside share */
+  padding: clamp(7px, 1vh + 0.15vw, 14px) clamp(9px, 1.3vh + 0.2vw, 18px);
   border: 1px solid var(--line);
   border-radius: 20px;
   /* fixed measure — the panel keeps its 1280px width instead of growing with
@@ -741,7 +743,7 @@ ul { list-style: none; }
      row uses it too, so the air above the row matches the air below it — the row
      reads centred in its band instead of sitting high. Vertical only: widening
      the padding would narrow the row and shrink the cards. */
-  --band-air: calc(clamp(9px, 1.3vh + 0.2vw, 18px) + 9.8px);
+  --band-air: calc(clamp(7px, 1vh + 0.15vw, 14px) + 9.8px);
   /* the band holds exactly two children, so the gap under the header is the same
      value as the padding around them: air above the header, between header and
      row, and under the row all come from --band-air */
@@ -760,7 +762,7 @@ ul { list-style: none; }
   align-items: center;
   gap: clamp(8px, 1.2vw, 12px);
   margin: 0;
-  padding-bottom: clamp(8px, 1.2vh, 12px);
+  padding-bottom: clamp(6px, 0.9vh, 10px);
   border-bottom: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: clamp(9.5px, 1vw, 11.5px);
